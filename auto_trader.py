@@ -39,18 +39,19 @@ def _check_and_install_dependencies():
             missing_packages.append(package_name)
     
     if missing_packages:
-        print("📦 Обнаружены отсутствующие библиотеки. Установка...")
-        print(f"   Устанавливаем: {', '.join(missing_packages)}")
         try:
+            # Используем ASCII-совместимые сообщения для Windows
+            print("[INFO] Missing libraries detected. Installing...")
+            print(f"[INFO] Installing: {', '.join(missing_packages)}")
             # Используем pip для установки
             subprocess.check_call([
                 sys.executable, "-m", "pip", "install", "-q"
             ] + missing_packages)
-            print("✅ Библиотеки успешно установлены!")
-            print("   Перезапустите скрипт для применения изменений.")
+            print("[SUCCESS] Libraries installed successfully!")
+            print("[INFO] Restart the script to apply changes.")
         except subprocess.CalledProcessError as e:
-            print(f"❌ Ошибка установки библиотек: {e}")
-            print("   Попробуйте установить вручную:")
+            print(f"[ERROR] Error installing libraries: {e}")
+            print("[INFO] Try installing manually:")
             print(f"   pip install {' '.join(missing_packages)}")
             # Не останавливаем выполнение, возможно библиотеки уже есть
 
