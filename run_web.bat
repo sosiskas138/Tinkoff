@@ -1,18 +1,31 @@
 @echo off
 setlocal enabledelayedexpansion
 REM Script to run web interface on Windows
+REM ============================================
+REM SET YOUR TOKEN HERE (replace your_sandbox_token_here with your actual token):
+REM ============================================
+set INVEST_TOKEN=your_sandbox_token_here
+REM ============================================
+
 REM Add current directory to PYTHONPATH
 set PYTHONPATH=%PYTHONPATH%;%CD%
 
-REM Check if INVEST_TOKEN is set
+REM Check if INVEST_TOKEN is set (and not the default value)
 if "%INVEST_TOKEN%"=="" (
-    echo [ERROR] Environment variable INVEST_TOKEN is not set
+    echo [ERROR] INVEST_TOKEN is not set
     echo.
-    echo Set sandbox token with command:
-    echo   set INVEST_TOKEN=your_sandbox_token_here
+    echo Please edit this file and set your token on line 7:
+    echo   set INVEST_TOKEN=your_actual_token_here
     echo.
-    echo Or set it via System Settings:
-    echo   Control Panel - System - Environment Variables
+    pause
+    exit /b 1
+)
+
+if "%INVEST_TOKEN%"=="your_sandbox_token_here" (
+    echo [ERROR] Please set your actual token in this file
+    echo.
+    echo Edit run_web.bat and replace "your_sandbox_token_here" with your actual token
+    echo on line 7: set INVEST_TOKEN=your_actual_token_here
     echo.
     pause
     exit /b 1
