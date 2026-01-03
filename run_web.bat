@@ -44,11 +44,41 @@ if errorlevel 1 (
 )
 
 echo [INFO] Checking dependencies...
+python -m pip install --upgrade pip >nul 2>&1
+
+REM Check for grpc (required for tinkoff API)
+python -c "import grpc" >nul 2>&1
+if errorlevel 1 (
+    echo [INFO] Installing grpc dependencies...
+    python -m pip install grpcio protobuf python-dateutil cachetools deprecation
+)
+
+REM Check for flask
 python -c "import flask" >nul 2>&1
 if errorlevel 1 (
-    echo [INFO] Installing dependencies for web interface...
-    python -m pip install --upgrade pip
-    python -m pip install flask plotly
+    echo [INFO] Installing flask...
+    python -m pip install flask
+)
+
+REM Check for plotly
+python -c "import plotly" >nul 2>&1
+if errorlevel 1 (
+    echo [INFO] Installing plotly...
+    python -m pip install plotly
+)
+
+REM Check for numpy (optional but recommended)
+python -c "import numpy" >nul 2>&1
+if errorlevel 1 (
+    echo [INFO] Installing numpy...
+    python -m pip install numpy
+)
+
+REM Check for pandas (optional but recommended)
+python -c "import pandas" >nul 2>&1
+if errorlevel 1 (
+    echo [INFO] Installing pandas...
+    python -m pip install pandas
 )
 
 echo.

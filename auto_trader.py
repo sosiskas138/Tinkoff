@@ -19,8 +19,12 @@ import logging
 def _check_and_install_dependencies():
     """Проверяет наличие необходимых библиотек и устанавливает их при необходимости"""
     # Словарь: имя модуля для импорта -> имя пакета для pip
+    # None означает, что модуль локальный и не нужно устанавливать из pip
     required_packages = {
-        'tinkoff': 'tinkoff-investments',  # tinkoff.invest импортируется через tinkoff
+        'grpc': 'grpcio',  # Требуется для tinkoff API
+        'google.protobuf': 'protobuf',  # Требуется для grpc
+        'dateutil': 'python-dateutil',  # Требуется для tinkoff
+        'cachetools': 'cachetools',  # Требуется для tinkoff
         'flask': 'flask',
         'plotly': 'plotly',
         'numpy': 'numpy',
@@ -30,13 +34,13 @@ def _check_and_install_dependencies():
     missing_packages = []
     for module_name, package_name in required_packages.items():
         try:
-            if module_name == 'tinkoff':
-                # Для tinkoff проверяем tinkoff.invest
-                __import__('tinkoff.invest')
+            if module_name == 'google.protobuf':
+                __import__('google.protobuf')
             else:
                 __import__(module_name)
         except ImportError:
-            missing_packages.append(package_name)
+            if package_name:
+                missing_packages.append(package_name)
     
     if missing_packages:
         try:
