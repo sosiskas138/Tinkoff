@@ -1,0 +1,3285 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tinkoff Invest Dashboard - Sandbox</title>
+    
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Plotly.js -->
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <!-- Bootstrap Icons -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
+    
+    <style>
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        .container {
+            padding-top: 2rem;
+            padding-bottom: 2rem;
+        }
+        .card {
+            border-radius: 15px;
+            box-shadow: 0 8px 16px rgba(0,0,0,0.1);
+            margin-bottom: 2rem;
+            border: none;
+        }
+        .card-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 15px 15px 0 0 !important;
+            font-weight: 600;
+        }
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border: none;
+        }
+        .btn-primary:hover {
+            background: linear-gradient(135deg, #764ba2 0%, #667eea 100%);
+        }
+        .stat-card {
+            background: white;
+            border-radius: 10px;
+            padding: 1.5rem;
+            margin-bottom: 1rem;
+        }
+        .stat-value {
+            font-size: 2rem;
+            font-weight: bold;
+            color: #667eea;
+        }
+        .stat-label {
+            color: #6c757d;
+            font-size: 0.9rem;
+        }
+        .loading {
+            text-align: center;
+            padding: 2rem;
+        }
+        .error-message {
+            background: #f8d7da;
+            color: #721c24;
+            padding: 1rem;
+            border-radius: 5px;
+            margin: 1rem 0;
+        }
+        .position-item {
+            border-left: 4px solid #667eea;
+            padding-left: 1rem;
+            margin-bottom: 1rem;
+        }
+        .positive {
+            color: #28a745;
+        }
+        .negative {
+            color: #dc3545;
+        }
+        .spin {
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="mb-0"><i class="bi bi-graph-up"></i> Tinkoff Invest Dashboard (Sandbox)</h3>
+            </div>
+            <div class="card-body">
+                <!-- Аккаунты -->
+                <div class="mb-4">
+                    <h5><i class="bi bi-person-circle"></i> Аккаунты</h5>
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <select id="accountSelect" class="form-select">
+                                <option value="">Загрузка...</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <button id="createAccountBtn" class="btn btn-success w-100"><i class="bi bi-plus-circle"></i> Создать аккаунт</button>
+                        </div>
+                        <div class="col-md-3">
+                            <button id="refreshBtn" class="btn btn-primary w-100"><i class="bi bi-arrow-clockwise"></i> Обновить</button>
+                        </div>
+                    </div>
+                    <div class="mb-2">
+                        <span id="accountBalance" class="badge bg-info" style="font-size: 1rem; padding: 0.5rem 1rem;">Баланс: загрузка...</span>
+                        <label class="form-check-label ms-3">
+                            <input type="checkbox" id="autoRefreshBalance" class="form-check-input" checked>
+                            Автообновление баланса (каждые 5 сек)
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Статистика портфеля -->
+                <div id="portfolioStats" class="row" style="display: none;">
+                    <div class="col-md-4">
+                        <div class="stat-card">
+                            <div class="stat-label">Общая стоимость</div>
+                            <div class="stat-value" id="totalAmount">0 ₽</div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="stat-card">
+                            <div class="stat-label">Доходность (ожидаемая)</div>
+                            <div class="stat-value" id="expectedYield">0%</div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="stat-card">
+                            <div class="stat-label">Доходность за день</div>
+                            <div class="stat-value" id="dailyYield">0 ₽</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Вкладки -->
+                <ul class="nav nav-tabs mt-4" id="mainTabs" role="tablist">
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link active" id="portfolio-tab" data-bs-toggle="tab" data-bs-target="#portfolio" type="button" role="tab">
+                            <i class="bi bi-briefcase"></i> Портфель
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="positions-tab" data-bs-toggle="tab" data-bs-target="#positions" type="button" role="tab">
+                            <i class="bi bi-list-ul"></i> Позиции
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="operations-tab" data-bs-toggle="tab" data-bs-target="#operations" type="button" role="tab">
+                            <i class="bi bi-clock-history"></i> Операции
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="orders-tab" data-bs-toggle="tab" data-bs-target="#orders" type="button" role="tab">
+                            <i class="bi bi-receipt"></i> Заявки
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="trading-tab" data-bs-toggle="tab" data-bs-target="#trading" type="button" role="tab">
+                            <i class="bi bi-currency-exchange"></i> Торговля
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="payin-tab" data-bs-toggle="tab" data-bs-target="#payin" type="button" role="tab">
+                            <i class="bi bi-wallet2"></i> Пополнение
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="charts-tab" data-bs-toggle="tab" data-bs-target="#charts" type="button" role="tab">
+                            <i class="bi bi-graph-up-arrow"></i> Графики
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="strategies-tab" data-bs-toggle="tab" data-bs-target="#strategies" type="button" role="tab">
+                            <i class="bi bi-cpu"></i> Стратегии
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="all-strategies-tab" data-bs-toggle="tab" data-bs-target="#all-strategies" type="button" role="tab">
+                            <i class="bi bi-list-check"></i> Все стратегии
+                        </button>
+                    </li>
+                </ul>
+
+                <div class="tab-content mt-3" id="mainTabsContent">
+                    <!-- Вкладка Портфель -->
+                    <div class="tab-pane fade show active" id="portfolio" role="tabpanel">
+                        <div class="card">
+                            <div class="card-header">
+                                <h5 class="mb-0"><i class="bi bi-briefcase"></i> Позиции портфеля</h5>
+                            </div>
+                            <div class="card-body">
+                                <div id="positionsContainer">
+                                    <div class="loading">Выберите аккаунт для просмотра портфеля</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Вкладка Позиции -->
+                    <div class="tab-pane fade" id="positions" role="tabpanel">
+                        <div class="card">
+                            <div class="card-header">
+                                <h5 class="mb-0"><i class="bi bi-list-ul"></i> Детальные позиции</h5>
+                            </div>
+                            <div class="card-body">
+                                <div id="detailedPositionsContainer">
+                                    <div class="loading">Выберите аккаунт для просмотра позиций</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Вкладка Операции -->
+                    <div class="tab-pane fade" id="operations" role="tabpanel">
+                        <div class="card">
+                            <div class="card-header">
+                                <h5 class="mb-0"><i class="bi bi-clock-history"></i> История операций</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="row mb-3">
+                                    <div class="col-md-4">
+                                        <select id="operationsDaysSelect" class="form-select">
+                                            <option value="7">7 дней</option>
+                                            <option value="30" selected>30 дней</option>
+                                            <option value="90">90 дней</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-8">
+                                        <button id="loadOperationsBtn" class="btn btn-primary"><i class="bi bi-arrow-clockwise"></i> Загрузить операции</button>
+                                    </div>
+                                </div>
+                                <div id="operationsContainer">
+                                    <div class="loading">Выберите аккаунт и нажмите "Загрузить операции"</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Вкладка Заявки -->
+                    <div class="tab-pane fade" id="orders" role="tabpanel">
+                        <div class="card">
+                            <div class="card-header">
+                                <h5 class="mb-0"><i class="bi bi-receipt"></i> Заявки (ордера)</h5>
+                            </div>
+                            <div class="card-body">
+                                <button id="loadOrdersBtn" class="btn btn-primary mb-3"><i class="bi bi-arrow-clockwise"></i> Загрузить заявки</button>
+                                <div id="ordersContainer">
+                                    <div class="loading">Выберите аккаунт и нажмите "Загрузить заявки"</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Вкладка Торговля -->
+                    <div class="tab-pane fade" id="trading" role="tabpanel">
+                        <div class="card">
+                            <div class="card-header">
+                                <h5 class="mb-0"><i class="bi bi-currency-exchange"></i> Создание заявки</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="mb-3">
+                                            <label class="form-label">FIGI или тикер</label>
+                                            <input type="text" id="tradingFigi" class="form-control" placeholder="BBG004730N88 или SBER">
+                                            <button id="getPriceBtn" class="btn btn-sm btn-outline-primary mt-2">Получить цену</button>
+                                            <div id="currentPrice" class="mt-2"></div>
+                                            <div id="tradingInstrumentInfo" class="alert alert-light mt-2" style="display: none;"></div>
+                                        </div>
+                                        <div class="mb-3">
+                                            <label class="form-label">Направление</label>
+                                            <select id="tradingDirection" class="form-select">
+                                                <option value="ORDER_DIRECTION_BUY">Покупка</option>
+                                                <option value="ORDER_DIRECTION_SELL">Продажа</option>
+                                            </select>
+                                        </div>
+                                        <div class="mb-3">
+                                            <label class="form-label">Тип ордера</label>
+                                            <select id="tradingOrderType" class="form-select">
+                                                <option value="ORDER_TYPE_MARKET" selected>Рыночный</option>
+                                                <option value="ORDER_TYPE_LIMIT">Лимитный</option>
+                                                <option value="ORDER_TYPE_BESTPRICE">Лучшая цена</option>
+                                            </select>
+                                        </div>
+                                        <div class="mb-3">
+                                            <label class="form-label">Количество лотов</label>
+                                            <input type="number" id="tradingQuantity" class="form-control" value="1" min="1">
+                                        </div>
+                                        <div class="mb-3" id="tradingPriceDiv" style="display: none;">
+                                            <label class="form-label">Цена (для лимитного)</label>
+                                            <input type="number" id="tradingPrice" class="form-control" step="0.01" min="0.01">
+                                        </div>
+                                        <button id="createOrderBtn" class="btn btn-success"><i class="bi bi-check-circle"></i> Создать заявку</button>
+                                        <div id="orderResult" class="mt-3"></div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="alert alert-info">
+                                            <h6><i class="bi bi-info-circle"></i> Информация</h6>
+                                            <p><strong>Рыночный ордер:</strong> исполняется по текущей рыночной цене</p>
+                                            <p><strong>Лимитный ордер:</strong> исполняется только по указанной цене или лучше</p>
+                                            <p><strong>Лучшая цена:</strong> исполняется по лучшей доступной цене</p>
+                                            <p class="mb-0"><strong>Лот:</strong> минимальная единица торговли (обычно 1 акция = 1 лот)</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Вкладка Стратегии -->
+                    <div class="tab-pane fade" id="strategies" role="tabpanel">
+                        <div class="mb-3 d-flex justify-content-end">
+                            <button id="addStrategyBtnFromStrategies" class="btn btn-success">
+                                <i class="bi bi-code-square"></i> Добавить стратегию из кода
+                            </button>
+                        </div>
+                        <ul class="nav nav-tabs mb-3" id="strategyTabs" role="tablist">
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link active" id="optimize-tab" data-bs-toggle="tab" data-bs-target="#optimize" type="button">
+                                    <i class="bi bi-gear"></i> Обучение стратегии
+                                </button>
+                            </li>
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link" id="backtest-tab" data-bs-toggle="tab" data-bs-target="#backtest" type="button">
+                                    <i class="bi bi-graph-up"></i> Тестирование
+                                </button>
+                            </li>
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link" id="trade-auto-tab" data-bs-toggle="tab" data-bs-target="#trade-auto" type="button">
+                                    <i class="bi bi-robot"></i> Автоторговля
+                                </button>
+                            </li>
+                        </ul>
+                        
+                        <div class="tab-content">
+                            <!-- Вкладка Обучение -->
+                            <div class="tab-pane fade show active" id="optimize" role="tabpanel">
+                                <div class="card">
+                                    <div class="card-header">
+                                        <h5 class="mb-0"><i class="bi bi-gear"></i> Обучение стратегии на исторических данных (4-5 лет)</h5>
+                                    </div>
+                                    <div class="card-body">
+                                        <div class="alert alert-info">
+                                            <i class="bi bi-info-circle"></i> Стратегия будет обучаться на данных за 4-5 лет, находить оптимальные параметры и сохранять их для дальнейшей торговли.
+                                        </div>
+                                        <div class="row">
+                                            <div class="col-md-6">
+                                                <h6>Параметры обучения</h6>
+                                                <div class="mb-3">
+                                                    <label class="form-label">Выберите сохраненную стратегию или введите FIGI</label>
+                                                    <select id="optimizeStrategySelect" class="form-select mb-2">
+                                                        <option value="">Загрузка стратегий...</option>
+                                                    </select>
+                                                    <button type="button" id="refreshOptimizeStrategiesBtn" class="btn btn-sm btn-outline-secondary mb-2">
+                                                        <i class="bi bi-arrow-clockwise"></i> Обновить список
+                                                    </button>
+                                                    <input type="text" id="optimizeFigi" class="form-control" placeholder="Или введите FIGI/тикер вручную (BBG004730N88 или SBER)">
+                                                </div>
+                                                <div class="row mb-3">
+                                                    <div class="col-md-6">
+                                                        <label class="form-label">Годы истории</label>
+                                                        <select id="optimizeYears" class="form-select">
+                                                            <option value="4">4 года</option>
+                                                            <option value="5" selected>5 лет</option>
+                                                        </select>
+                                                    </div>
+                                                    <div class="col-md-6">
+                                                        <label class="form-label">Метод оптимизации</label>
+                                                        <select id="optimizeMethod" class="form-select">
+                                                            <option value="genetic" selected>Генетический алгоритм</option>
+                                                            <option value="grid">Сеточный поиск</option>
+                                                        </select>
+                                                    </div>
+                                                </div>
+                                                <div class="row mb-3" id="geneticParams">
+                                                    <div class="col-md-6">
+                                                        <label class="form-label">Размер популяции</label>
+                                                        <input type="number" id="populationSize" class="form-control" value="50" min="20" max="200">
+                                                    </div>
+                                                    <div class="col-md-6">
+                                                        <label class="form-label">Поколения</label>
+                                                        <input type="number" id="generations" class="form-control" value="20" min="5" max="50">
+                                                    </div>
+                                                </div>
+                                                <div class="row mb-3" id="gridParams" style="display: none;">
+                                                    <div class="col-md-12">
+                                                        <label class="form-label">Максимум итераций</label>
+                                                        <input type="number" id="maxIterations" class="form-control" value="500" min="100" max="2000">
+                                                    </div>
+                                                </div>
+                                                <div class="row mb-3">
+                                                    <div class="col-md-6">
+                                                        <label class="form-label">Начальный баланс (₽)</label>
+                                                        <input type="number" id="optimizeInitialBalance" class="form-control" value="100000" min="10000" step="10000">
+                                                    </div>
+                                                    <div class="col-md-6">
+                                                        <label class="form-label">Комиссия (%)</label>
+                                                        <input type="number" id="optimizeCommission" class="form-control" value="0.05" min="0" max="1" step="0.01">
+                                                    </div>
+                                                </div>
+                                                <button id="optimizeBtn" class="btn btn-primary w-100"><i class="bi bi-cpu"></i> Начать обучение</button>
+                                                <div id="optimizeProgress" class="mt-3" style="display: none;">
+                                                    <div class="progress">
+                                                        <div id="optimizeProgressBar" class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 0%"></div>
+                                                    </div>
+                                                    <p class="text-center mt-2"><small id="optimizeStatus">Загрузка данных...</small></p>
+                                                </div>
+                                                <hr class="my-4">
+                                                <h6>Или вставьте свою стратегию в виде кода</h6>
+                                                <div class="mb-3">
+                                                    <label class="form-label">FIGI</label>
+                                                    <input type="text" id="codeStrategyFigi" class="form-control" placeholder="BBG004730N88">
+                                                </div>
+                                                <div class="mb-3">
+                                                    <label class="form-label">Код стратегии (Python)</label>
+                                                    <textarea id="strategyCode" class="form-control" rows="15" placeholder='from strategy_optimizer import OptimizedParams, AdaptiveStrategy
+from datetime import datetime
+
+# Создайте OptimizedParams с параметрами вашей стратегии
+params = OptimizedParams(
+    kama_len=21,
+    kama_fast=2,
+    kama_slow=20,
+    entry_mult=1.6,
+    exit_mult=0.8,
+    atr_len=14,
+    atr_sl_mult=2.2,
+    atr_phase_len=50,
+    atr_phase_mult=1.0,
+    body_atr_mult=0.5,
+    fitness_score=0.0,
+    total_profit_pct=0.0,
+    sharpe_ratio=0.0,
+    max_drawdown_pct=0.0,
+    win_rate=0.0,
+    total_trades=0
+)
+
+# Создайте AdaptiveStrategy
+strategy = AdaptiveStrategy(
+    figi="BBG004730N88",
+    optimized_params=params
+)'></textarea>
+                                                    <small class="text-muted">В коде должна быть определена переменная <code>strategy</code> типа <code>AdaptiveStrategy</code></small>
+                                                </div>
+                                                <button id="saveStrategyFromCodeBtn" class="btn btn-success w-100"><i class="bi bi-save"></i> Сохранить стратегию из кода</button>
+                                            </div>
+                                            <div class="col-md-6">
+                                                <h6>Результаты обучения</h6>
+                                                <div id="optimizeResults" class="alert alert-light">
+                                                    <p class="text-muted mb-0">Запустите обучение для получения результатов</p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Вкладка Тестирование -->
+                            <div class="tab-pane fade" id="backtest" role="tabpanel">
+                                <div class="card">
+                                    <div class="card-header">
+                                        <h5 class="mb-0"><i class="bi bi-graph-up"></i> Тестирование торговых стратегий</h5>
+                                    </div>
+                                    <div class="card-body">
+                                        <div class="row">
+                                            <div class="col-md-6">
+                                                <h6>Параметры тестирования</h6>
+                                        <div class="mb-3">
+                                            <label class="form-label">FIGI или тикер</label>
+                                            <input type="text" id="strategyFigi" class="form-control" placeholder="BBG004730N88 или SBER">
+                                        </div>
+                                        <div class="mb-3">
+                                            <label class="form-label">Тип стратегии</label>
+                                            <select id="strategyType" class="form-select">
+                                                <option value="KAMA">KAMA-Core v1.1</option>
+                                            </select>
+                                        </div>
+                                        <div class="row mb-3">
+                                            <div class="col-md-6">
+                                                <label class="form-label">Период (дней)</label>
+                                                <input type="number" id="strategyDays" class="form-control" value="30" min="1" max="365">
+                                            </div>
+                                            <div class="col-md-6">
+                                                <label class="form-label">Интервал</label>
+                                                <select id="strategyInterval" class="form-select">
+                                                    <option value="hour" selected>Час</option>
+                                                    <option value="day">День</option>
+                                                    <option value="15minute">15 минут</option>
+                                                    <option value="5minute">5 минут</option>
+                                                </select>
+                                            </div>
+                                        </div>
+                                        <div class="row mb-3">
+                                            <div class="col-md-6">
+                                                <label class="form-label">Начальный баланс (₽)</label>
+                                                <input type="number" id="strategyInitialBalance" class="form-control" value="100000" min="1000" step="1000">
+                                            </div>
+                                            <div class="col-md-6">
+                                                <label class="form-label">Комиссия (%)</label>
+                                                <input type="number" id="strategyCommission" class="form-control" value="0.05" min="0" max="1" step="0.01">
+                                            </div>
+                                        </div>
+                                        <h6 class="mt-4">Параметры KAMA стратегии</h6>
+                                        <div class="row mb-3">
+                                            <div class="col-md-4">
+                                                <label class="form-label">KAMA Length</label>
+                                                <input type="number" id="kamaLen" class="form-control" value="21" min="1">
+                                            </div>
+                                            <div class="col-md-4">
+                                                <label class="form-label">Fast Length</label>
+                                                <input type="number" id="kamaFast" class="form-control" value="2" min="1">
+                                            </div>
+                                            <div class="col-md-4">
+                                                <label class="form-label">Slow Length</label>
+                                                <input type="number" id="kamaSlow" class="form-control" value="20" min="1">
+                                            </div>
+                                        </div>
+                                        <div class="row mb-3">
+                                            <div class="col-md-6">
+                                                <label class="form-label">Entry Sensitivity</label>
+                                                <input type="number" id="entryMult" class="form-control" value="1.6" min="0.1" step="0.1">
+                                            </div>
+                                            <div class="col-md-6">
+                                                <label class="form-label">Exit Sensitivity</label>
+                                                <input type="number" id="exitMult" class="form-control" value="0.8" min="0.1" step="0.1">
+                                            </div>
+                                        </div>
+                                        <div class="row mb-3">
+                                            <div class="col-md-4">
+                                                <label class="form-label">ATR Length</label>
+                                                <input type="number" id="atrLen" class="form-control" value="14" min="1">
+                                            </div>
+                                            <div class="col-md-4">
+                                                <label class="form-label">ATR SL Multiplier</label>
+                                                <input type="number" id="atrSlMult" class="form-control" value="2.2" min="0.1" step="0.1">
+                                            </div>
+                                            <div class="col-md-4">
+                                                <label class="form-label">ATR Phase Length</label>
+                                                <input type="number" id="atrPhaseLen" class="form-control" value="50" min="1">
+                                            </div>
+                                        </div>
+                                        <button id="runBacktestBtn" class="btn btn-primary w-100"><i class="bi bi-play-circle"></i> Запустить тестирование</button>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <h6>Результаты тестирования</h6>
+                                        <div id="backtestResults" class="alert alert-light">
+                                            <p class="text-muted mb-0">Заполните параметры и запустите тестирование</p>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="row mt-4">
+                                    <div class="col-12">
+                                        <div id="backtestChartContainer" style="display: none;">
+                                            <h6>Кривая капитала</h6>
+                                            <div id="backtestChart"></div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="row mt-4">
+                                    <div class="col-12">
+                                        <div id="backtestTradesContainer" style="display: none;">
+                                            <h6>Сделки</h6>
+                                            <div class="table-responsive">
+                                                <table class="table table-striped table-sm" id="backtestTradesTable">
+                                                    <thead>
+                                                        <tr>
+                                                            <th>Вход</th>
+                                                            <th>Выход</th>
+                                                            <th>Цена входа</th>
+                                                            <th>Цена выхода</th>
+                                                            <th>Прибыль</th>
+                                                            <th>Прибыль %</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody></tbody>
+                                                </table>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Вкладка Автоторговля -->
+                    <div class="tab-pane fade" id="trade-auto" role="tabpanel">
+                        <div class="card">
+                            <div class="card-header">
+                                <h5 class="mb-0"><i class="bi bi-robot"></i> Автоматическая торговля с адаптацией</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="alert alert-warning">
+                                    <i class="bi bi-exclamation-triangle"></i> <strong>Внимание!</strong> Автоматическая торговля использует оптимизированные параметры стратегии. Убедитесь, что стратегия обучена перед запуском.
+                                </div>
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <h6>Настройки автоторговли</h6>
+                                        <div class="mb-3">
+                                            <label class="form-label">Выбрать сохраненную стратегию</label>
+                                            <select id="autoTradeStrategySelect" class="form-select">
+                                                <option value="">Загрузка стратегий...</option>
+                                            </select>
+                                            <button id="loadStrategiesBtn" class="btn btn-sm btn-outline-primary mt-2">Обновить список</button>
+                                        </div>
+                                        <div class="mb-3">
+                                            <label class="form-label">FIGI (автоматически из стратегии)</label>
+                                            <input type="text" id="autoTradeFigi" class="form-control" placeholder="Выберите стратегию" readonly>
+                                        </div>
+                                        <div class="mb-3">
+                                            <label class="form-label">Интервал для анализа</label>
+                                            <select id="autoTradeInterval" class="form-select">
+                                                <option value="hour" selected>Час</option>
+                                                <option value="day">День</option>
+                                                <option value="15minute">15 минут</option>
+                                            </select>
+                                        </div>
+                                        <div class="mb-3">
+                                            <label class="form-label">Период переобучения (дней)</label>
+                                            <input type="number" id="retrainPeriod" class="form-control" value="30" min="7" max="90">
+                                            <small class="text-muted">Стратегия будет переобучаться через указанное количество дней</small>
+                                        </div>
+                                        <div class="mb-3">
+                                            <label class="form-label">Процент капитала на сделку (%)</label>
+                                            <input type="number" id="tradePercent" class="form-control" value="100" min="1" max="100">
+                                        </div>
+                                        <div class="mb-3">
+                                            <button id="startAutoTradeBtn" class="btn btn-success w-100 mb-2"><i class="bi bi-play-circle"></i> Запустить автоторговлю</button>
+                                            <button id="stopAutoTradeBtn" class="btn btn-danger w-100" disabled><i class="bi bi-stop-circle"></i> Остановить автоторговлю</button>
+                                        </div>
+                                        <div id="autoTradeStatus" class="alert alert-info">
+                                            Статус: Остановлена
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <h6>Загруженная стратегия</h6>
+                                        <div id="loadedStrategyInfo" class="alert alert-light">
+                                            <p class="text-muted mb-0">Выберите стратегию из списка</p>
+                                        </div>
+                                        <h6 class="mt-4">Последние сигналы</h6>
+                                        <div id="autoTradeSignals" class="alert alert-light">
+                                            <p class="text-muted mb-0">Нет сигналов</p>
+                                        </div>
+                                    </div>
+                                </div>
+                                <hr>
+                                <div class="row">
+                                    <div class="col-12">
+                                        <h6><i class="bi bi-graph-up"></i> График работы автоторговли</h6>
+                                        <div class="mb-2">
+                                            <button id="refreshChartBtn" class="btn btn-sm btn-outline-primary">Обновить график</button>
+                                        </div>
+                                        <div id="autoTradeChart" style="height: 500px;"></div>
+                                    </div>
+                                </div>
+                                <hr>
+                                <div class="row">
+                                    <div class="col-12">
+                                        <h6><i class="bi bi-journal-text"></i> Логи автоторговли</h6>
+                                        <div class="mb-2">
+                                            <button id="refreshLogsBtn" class="btn btn-sm btn-outline-primary">Обновить логи</button>
+                                            <button id="clearLogsBtn" class="btn btn-sm btn-outline-secondary">Очистить</button>
+                                        </div>
+                                        <div id="autoTradeLogs" style="max-height: 400px; overflow-y: auto; background: #f8f9fa; padding: 1rem; border-radius: 5px; font-family: monospace; font-size: 0.85rem;">
+                                            <div class="text-muted">Логи появятся после запуска автоторговли</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Вкладка Все стратегии -->
+                    <div class="tab-pane fade" id="all-strategies" role="tabpanel">
+                        <div class="card">
+                            <div class="card-header d-flex justify-content-between align-items-center">
+                                <h5 class="mb-0"><i class="bi bi-list-check"></i> Все сохраненные стратегии</h5>
+                                <div>
+                                    <button id="refreshStrategiesBtn" class="btn btn-sm btn-outline-light"><i class="bi bi-arrow-clockwise"></i> Обновить</button>
+                                    <button id="addStrategyBtn" class="btn btn-sm btn-success"><i class="bi bi-plus-circle"></i> Добавить стратегию</button>
+                                </div>
+                            </div>
+                            <div class="card-body">
+                                <div id="strategiesListContainer">
+                                    <div class="loading">Загрузка стратегий...</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Вкладка Пополнение -->
+                    <div class="tab-pane fade" id="payin" role="tabpanel">
+                        <div class="card">
+                            <div class="card-header">
+                                <h5 class="mb-0"><i class="bi bi-wallet2"></i> Пополнение счета (Sandbox)</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="mb-3">
+                                            <label class="form-label">Сумма пополнения</label>
+                                            <input type="number" id="payinAmount" class="form-control" placeholder="1000000" value="1000000" step="0.01" min="0.01">
+                                        </div>
+                                        <div class="mb-3">
+                                            <label class="form-label">Валюта</label>
+                                            <select id="payinCurrency" class="form-select">
+                                                <option value="rub" selected>RUB (рубли)</option>
+                                                <option value="usd">USD (доллары)</option>
+                                                <option value="eur">EUR (евро)</option>
+                                            </select>
+                                        </div>
+                                        <button id="payinBtn" class="btn btn-success"><i class="bi bi-plus-circle"></i> Пополнить счет</button>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="alert alert-info">
+                                            <h6><i class="bi bi-info-circle"></i> Информация</h6>
+                                            <p>В sandbox режиме вы можете пополнять счет виртуальными деньгами для тестирования.</p>
+                                            <p>Рекомендуемая сумма для начала: <strong>1 000 000 ₽</strong></p>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div id="payinResult" class="mt-3"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Вкладка Графики -->
+                    <div class="tab-pane fade" id="charts" role="tabpanel">
+                        <div class="card">
+                            <div class="card-header">
+                                <h5 class="mb-0"><i class="bi bi-graph-up-arrow"></i> График свечей с индикаторами</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="row mb-3">
+                                    <div class="col-md-3">
+                                        <input type="text" id="figiInput" class="form-control" placeholder="FIGI или тикер (например, BBG004730N88 или SBER)">
+                                    </div>
+                                    <div class="col-md-2">
+                                        <select id="intervalSelect" class="form-select">
+                                            <option value="minute">1 минута</option>
+                                            <option value="5minute">5 минут</option>
+                                            <option value="15minute">15 минут</option>
+                                            <option value="hour" selected>1 час</option>
+                                            <option value="day">1 день</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-2">
+                                        <select id="daysSelect" class="form-select">
+                                            <option value="1">1 день</option>
+                                            <option value="3">3 дня</option>
+                                            <option value="7" selected>7 дней</option>
+                                            <option value="30">30 дней</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <select id="indicatorSelect" class="form-select">
+                                            <option value="">Без индикатора</option>
+                                            <option value="RSI">RSI (Relative Strength Index)</option>
+                                            <option value="MACD">MACD</option>
+                                            <option value="SMA">SMA (Simple Moving Average)</option>
+                                            <option value="EMA">EMA (Exponential Moving Average)</option>
+                                            <option value="BB">BB (Bollinger Bands)</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-2">
+                                        <button id="loadChartBtn" class="btn btn-primary w-100">Загрузить</button>
+                                    </div>
+                                </div>
+                                <div id="chartContainer">
+                                    <div class="loading">Введите FIGI или тикер и нажмите "Загрузить"</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <script>
+        let currentAccountId = '';
+        let balanceUpdateInterval = null;
+        let currentChartFigi = '';
+
+        // Загрузка аккаунтов
+        async function loadAccounts() {
+            try {
+                const response = await fetch('/api/accounts');
+                const data = await response.json();
+                
+                if (data.success) {
+                    const select = document.getElementById('accountSelect');
+                    
+                    if (data.accounts.length === 0) {
+                        select.innerHTML = '<option value="">Аккаунтов нет. Создайте новый аккаунт.</option>';
+                    } else {
+                        select.innerHTML = '<option value="">Выберите аккаунт...</option>';
+                        
+                        data.accounts.forEach(acc => {
+                            const option = document.createElement('option');
+                            option.value = acc.id;
+                            option.textContent = `${acc.name || 'Аккаунт'} (${acc.type})`;
+                            select.appendChild(option);
+                        });
+                        
+                        if (data.accounts.length > 0) {
+                            select.value = data.accounts[0].id;
+                            currentAccountId = data.accounts[0].id;
+                            loadPortfolio(data.accounts[0].id);
+                        }
+                    }
+                } else {
+                    showError('Ошибка загрузки аккаунтов: ' + data.error);
+                }
+            } catch (error) {
+                showError('Ошибка: ' + error.message);
+            }
+        }
+
+        // Создание аккаунта
+        async function createAccount() {
+            if (!confirm('Создать новый sandbox аккаунт?')) {
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/accounts/create', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({})
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    alert('Аккаунт успешно создан! ID: ' + data.account_id);
+                    loadAccounts(); // Перезагружаем список аккаунтов
+                } else {
+                    alert('Ошибка создания аккаунта: ' + data.error);
+                }
+            } catch (error) {
+                alert('Ошибка: ' + error.message);
+            }
+        }
+
+        // Загрузка портфеля
+        async function loadPortfolio(accountId) {
+            if (!accountId) return;
+            
+            const container = document.getElementById('positionsContainer');
+            container.innerHTML = '<div class="loading"><i class="bi bi-arrow-repeat spin"></i> Загрузка портфеля...</div>';
+            
+            try {
+                const response = await fetch(`/api/portfolio/${accountId}`);
+                const data = await response.json();
+                
+                if (data.success) {
+                    const portfolio = data.portfolio;
+                    
+                    // Обновляем статистику
+                    document.getElementById('totalAmount').textContent = formatCurrency(portfolio.total_amount_portfolio);
+                    document.getElementById('expectedYield').textContent = formatPercent(portfolio.expected_yield);
+                    document.getElementById('dailyYield').textContent = formatCurrency(portfolio.daily_yield);
+                    document.getElementById('portfolioStats').style.display = 'flex';
+                    
+                    // Отображаем позиции
+                    if (portfolio.positions.length === 0) {
+                        container.innerHTML = '<div class="text-center text-muted">Позиций нет</div>';
+                    } else {
+                        let html = '';
+                        portfolio.positions.forEach(pos => {
+                            const yieldClass = pos.expected_yield >= 0 ? 'positive' : 'negative';
+                            html += `
+                                <div class="position-item">
+                                    <h6>${pos.name || pos.ticker} (${pos.ticker})</h6>
+                                    <div class="row">
+                                        <div class="col-md-3">
+                                            <small class="text-muted">Количество:</small><br>
+                                            <strong>${formatNumber(pos.quantity)}</strong>
+                                        </div>
+                                        <div class="col-md-3">
+                                            <small class="text-muted">Средняя цена:</small><br>
+                                            <strong>${formatCurrency(pos.average_position_price)}</strong>
+                                        </div>
+                                        <div class="col-md-3">
+                                            <small class="text-muted">Доходность:</small><br>
+                                            <strong class="${yieldClass}">${formatPercent(pos.expected_yield)}</strong>
+                                        </div>
+                                        <div class="col-md-3">
+                                            <small class="text-muted">FIGI:</small><br>
+                                            <code>${pos.figi}</code>
+                                        </div>
+                                    </div>
+                                </div>
+                            `;
+                        });
+                        container.innerHTML = html;
+                    }
+                } else {
+                    container.innerHTML = `<div class="error-message">Ошибка: ${data.error}</div>`;
+                }
+            } catch (error) {
+                container.innerHTML = `<div class="error-message">Ошибка: ${error.message}</div>`;
+            }
+        }
+
+        // Загрузка графика
+        async function loadChart() {
+            const figi = document.getElementById('figiInput').value.trim();
+            if (!figi) {
+                alert('Введите FIGI или тикер');
+                return;
+            }
+            
+            const interval = document.getElementById('intervalSelect').value;
+            const days = document.getElementById('daysSelect').value;
+            const indicatorType = document.getElementById('indicatorSelect').value;
+            const container = document.getElementById('chartContainer');
+            
+            container.innerHTML = '<div class="loading"><i class="bi bi-arrow-repeat spin"></i> Загрузка данных...</div>';
+            
+            try {
+                // Загружаем свечи и индикаторы параллельно
+                const [candlesResponse, indicatorsResponse] = await Promise.all([
+                    fetch(`/api/candles?figi=${encodeURIComponent(figi)}&interval=${interval}&days=${days}`),
+                    indicatorType ? fetch(`/api/indicators/${encodeURIComponent(figi)}?type=${indicatorType}&days=${days}`) : Promise.resolve(null)
+                ]);
+                
+                const candlesData = await candlesResponse.json();
+                
+                if (!candlesData.success) {
+                    container.innerHTML = `<div class="error-message">Ошибка: ${candlesData.error}</div>`;
+                    return;
+                }
+                
+                const candles = candlesData.candles;
+                const times = candles.map(c => c.time);
+                const opens = candles.map(c => c.open);
+                const highs = candles.map(c => c.high);
+                const lows = candles.map(c => c.low);
+                const closes = candles.map(c => c.close);
+                const volumes = candles.map(c => c.volume);
+                
+                const traces = [];
+                
+                // Свечной график
+                traces.push({
+                    x: times,
+                    open: opens,
+                    high: highs,
+                    low: lows,
+                    close: closes,
+                    type: 'candlestick',
+                    name: candlesData.instrument_ticker,
+                    increasing: {line: {color: '#28a745'}},
+                    decreasing: {line: {color: '#dc3545'}}
+                });
+                
+                // Индикаторы
+                if (indicatorsResponse) {
+                    const indicatorsData = await indicatorsResponse.json();
+                    if (indicatorsData.success && indicatorsData.indicators.length > 0) {
+                        const indicatorTimes = indicatorsData.indicators.map(i => i.time);
+                        
+                        if (indicatorType === 'RSI' && indicatorsData.indicators[0].signal !== undefined) {
+                            const rsiValues = indicatorsData.indicators.map(i => i.signal);
+                            traces.push({
+                                x: indicatorTimes,
+                                y: rsiValues,
+                                type: 'scatter',
+                                mode: 'lines',
+                                name: 'RSI',
+                                yaxis: 'y3',
+                                line: {color: '#ff9800', width: 2}
+                            });
+                        } else if (indicatorType === 'MACD') {
+                            if (indicatorsData.indicators[0].macd !== undefined) {
+                                const macdValues = indicatorsData.indicators.map(i => i.macd || 0);
+                                const signalValues = indicatorsData.indicators.map(i => i.signal || 0);
+                                traces.push({
+                                    x: indicatorTimes,
+                                    y: macdValues,
+                                    type: 'scatter',
+                                    mode: 'lines',
+                                    name: 'MACD',
+                                    yaxis: 'y3',
+                                    line: {color: '#2196F3', width: 2}
+                                });
+                                traces.push({
+                                    x: indicatorTimes,
+                                    y: signalValues,
+                                    type: 'scatter',
+                                    mode: 'lines',
+                                    name: 'Signal',
+                                    yaxis: 'y3',
+                                    line: {color: '#f44336', width: 2}
+                                });
+                            }
+                        } else if (indicatorType === 'BB' && indicatorsData.indicators[0].upper_band !== undefined) {
+                            const upperBand = indicatorsData.indicators.map(i => i.upper_band);
+                            const middleBand = indicatorsData.indicators.map(i => i.middle_band);
+                            const lowerBand = indicatorsData.indicators.map(i => i.lower_band);
+                            traces.push({
+                                x: indicatorTimes,
+                                y: upperBand,
+                                type: 'scatter',
+                                mode: 'lines',
+                                name: 'Upper Band',
+                                line: {color: '#9c27b0', width: 1, dash: 'dash'}
+                            });
+                            traces.push({
+                                x: indicatorTimes,
+                                y: middleBand,
+                                type: 'scatter',
+                                mode: 'lines',
+                                name: 'Middle Band',
+                                line: {color: '#607d8b', width: 1}
+                            });
+                            traces.push({
+                                x: indicatorTimes,
+                                y: lowerBand,
+                                type: 'scatter',
+                                mode: 'lines',
+                                name: 'Lower Band',
+                                line: {color: '#9c27b0', width: 1, dash: 'dash'}
+                            });
+                        } else if ((indicatorType === 'SMA' || indicatorType === 'EMA') && indicatorsData.indicators[0].signal !== undefined) {
+                            const maValues = indicatorsData.indicators.map(i => i.signal);
+                            traces.push({
+                                x: indicatorTimes,
+                                y: maValues,
+                                type: 'scatter',
+                                mode: 'lines',
+                                name: indicatorType,
+                                line: {color: '#ff9800', width: 2}
+                            });
+                        }
+                    }
+                }
+                
+                // Объемы
+                traces.push({
+                    x: times,
+                    y: volumes,
+                    type: 'bar',
+                    name: 'Объем',
+                    marker: {color: 'rgba(102, 126, 234, 0.5)'},
+                    yaxis: 'y2'
+                });
+                
+                const layout = {
+                    title: `${candlesData.instrument_name} (${candlesData.instrument_ticker})${indicatorType ? ' + ' + indicatorType : ''}`,
+                    xaxis: {
+                        title: 'Время',
+                        type: 'date'
+                    },
+                    yaxis: {
+                        title: 'Цена (₽)',
+                        side: 'right',
+                        domain: indicatorType === 'RSI' || indicatorType === 'MACD' ? [0.3, 1] : [0.2, 1]
+                    },
+                    yaxis2: {
+                        title: 'Объем',
+                        overlaying: 'y',
+                        side: 'left',
+                        showgrid: false,
+                        domain: [0, 0.2]
+                    },
+                    yaxis3: indicatorType === 'RSI' || indicatorType === 'MACD' ? {
+                        title: indicatorType,
+                        side: 'right',
+                        domain: [0, 0.28],
+                        anchor: 'x'
+                    } : undefined,
+                    plot_bgcolor: 'rgba(0,0,0,0)',
+                    paper_bgcolor: 'rgba(0,0,0,0)',
+                    height: 600
+                };
+                
+                // Удаляем undefined свойства
+                if (!layout.yaxis3) {
+                    delete layout.yaxis3;
+                }
+                
+                container.innerHTML = '<div id="chart"></div>';
+                Plotly.newPlot('chart', traces, layout, {responsive: true});
+                
+                // Сохраняем FIGI для торговли
+                currentChartFigi = figi;
+                
+                // Добавляем обработчик клика на график для торговли
+                document.getElementById('chart').on('plotly_click', function(data) {
+                    if (data.points && data.points.length > 0) {
+                        const point = data.points[0];
+                        const clickPrice = point.y;
+                        const clickTime = point.x;
+                        
+                        // Показываем диалог для создания ордера
+                        if (currentAccountId) {
+                            const direction = confirm(`Цена клика: ${formatCurrency(clickPrice)}\n\nКупить по этой цене? (ОК = Купить, Отмена = Продать)`) ? 'BUY' : 'SELL';
+                            const quantity = prompt(`Введите количество лотов для ${direction === 'BUY' ? 'покупки' : 'продажи'}:`, '1');
+                            
+                            if (quantity && !isNaN(quantity) && parseInt(quantity) > 0) {
+                                // Заполняем форму торговли
+                                document.getElementById('tradingFigi').value = figi;
+                                document.getElementById('tradingQuantity').value = quantity;
+                                document.getElementById('tradingDirection').value = direction === 'BUY' ? 'ORDER_DIRECTION_BUY' : 'ORDER_DIRECTION_SELL';
+                                document.getElementById('tradingPrice').value = clickPrice.toFixed(2);
+                                document.getElementById('tradingOrderType').value = 'ORDER_TYPE_LIMIT';
+                                
+                                // Переключаемся на вкладку торговли
+                                const tradeTab = document.getElementById('trade-tab');
+                                if (tradeTab) {
+                                    const bootstrapTab = new bootstrap.Tab(tradeTab);
+                                    bootstrapTab.show();
+                                }
+                                
+                                // Можно автоматически создать ордер (раскомментировать если нужно)
+                                // createOrderFromChart(figi, parseInt(quantity), direction, clickPrice);
+                            }
+                        } else {
+                            alert('Сначала выберите аккаунт');
+                        }
+                    }
+                });
+            } catch (error) {
+                container.innerHTML = `<div class="error-message">Ошибка: ${error.message}</div>`;
+            }
+        }
+        
+        // Создание ордера с графика
+        async function createOrderFromChart(figi, quantity, direction, price) {
+            if (!currentAccountId) {
+                alert('Выберите аккаунт');
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/order/create', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        account_id: currentAccountId,
+                        figi: figi,
+                        quantity: quantity,
+                        direction: direction === 'BUY' ? 'ORDER_DIRECTION_BUY' : 'ORDER_DIRECTION_SELL',
+                        order_type: 'ORDER_TYPE_LIMIT',
+                        price: price
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    alert(`Ордер создан успешно! ID: ${data.order_id}`);
+                    if (currentAccountId) {
+                        loadOrders(currentAccountId);
+                        loadPortfolio(currentAccountId);
+                        loadBalance(currentAccountId);
+                    }
+                } else {
+                    alert(`Ошибка создания ордера: ${data.error}`);
+                }
+            } catch (error) {
+                alert(`Ошибка: ${error.message}`);
+            }
+        }
+
+        // Форматирование валюты
+        function formatCurrency(value) {
+            return new Intl.NumberFormat('ru-RU', {
+                style: 'currency',
+                currency: 'RUB',
+                minimumFractionDigits: 2
+            }).format(value);
+        }
+
+        // Форматирование процентов
+        function formatPercent(value) {
+            const sign = value >= 0 ? '+' : '';
+            return `${sign}${value.toFixed(2)}%`;
+        }
+
+        // Форматирование чисел
+        function formatNumber(value) {
+            return new Intl.NumberFormat('ru-RU').format(value);
+        }
+
+        // Показать ошибку
+        function showError(message) {
+            const container = document.getElementById('positionsContainer');
+            container.innerHTML = `<div class="error-message">${message}</div>`;
+        }
+
+        // Обработчики событий
+        document.getElementById('accountSelect').addEventListener('change', function() {
+            currentAccountId = this.value;
+            if (currentAccountId) {
+                loadPortfolio(currentAccountId);
+                loadDetailedPositions(currentAccountId);
+                loadOperations(currentAccountId);
+                loadOrders(currentAccountId);
+                
+                // Запускаем автообновление баланса
+                startBalanceAutoRefresh();
+            } else {
+                stopBalanceAutoRefresh();
+            }
+        });
+        
+        // Автообновление баланса
+        function startBalanceAutoRefresh() {
+            stopBalanceAutoRefresh(); // Останавливаем предыдущий интервал если есть
+            
+            const autoRefreshCheckbox = document.getElementById('autoRefreshBalance');
+            if (autoRefreshCheckbox && autoRefreshCheckbox.checked && currentAccountId) {
+                balanceUpdateInterval = setInterval(() => {
+                    if (currentAccountId) {
+                        loadBalance(currentAccountId);
+                        // Также обновляем портфель, если активна вкладка портфеля
+                        const portfolioTab = document.getElementById('portfolio-tab');
+                        if (portfolioTab && portfolioTab.classList.contains('active')) {
+                            loadPortfolio(currentAccountId);
+                        }
+                    }
+                }, 5000); // Каждые 5 секунд
+            }
+        }
+        
+        function stopBalanceAutoRefresh() {
+            if (balanceUpdateInterval) {
+                clearInterval(balanceUpdateInterval);
+                balanceUpdateInterval = null;
+            }
+        }
+        
+        // Обработчик чекбокса автообновления
+        document.getElementById('autoRefreshBalance').addEventListener('change', function() {
+            if (this.checked && currentAccountId) {
+                startBalanceAutoRefresh();
+            } else {
+                stopBalanceAutoRefresh();
+            }
+        });
+
+        // Загрузка детальных позиций
+        async function loadDetailedPositions(accountId) {
+            if (!accountId) return;
+            
+            const container = document.getElementById('detailedPositionsContainer');
+            container.innerHTML = '<div class="loading"><i class="bi bi-arrow-repeat spin"></i> Загрузка позиций...</div>';
+            
+            try {
+                const response = await fetch(`/api/positions/${accountId}`);
+                const data = await response.json();
+                
+                if (data.success) {
+                    const positions = data.positions;
+                    let html = '<div class="row"><div class="col-md-6"><h6>Денежные средства</h6>';
+                    
+                    if (positions.money.length === 0) {
+                        html += '<p class="text-muted">Нет денежных средств</p>';
+                    } else {
+                        positions.money.forEach(m => {
+                            html += `<div class="position-item"><strong>${m.currency.toUpperCase()}:</strong> ${formatCurrency(m.value)}</div>`;
+                        });
+                    }
+                    
+                    html += '</div><div class="col-md-6"><h6>Ценные бумаги</h6>';
+                    
+                    if (positions.securities.length === 0) {
+                        html += '<p class="text-muted">Нет ценных бумаг</p>';
+                    } else {
+                        positions.securities.forEach(sec => {
+                            html += `
+                                <div class="position-item">
+                                    <h6>${sec.name || sec.ticker} (${sec.ticker})</h6>
+                                    <div><small>FIGI:</small> <code>${sec.figi}</code></div>
+                                    <div><small>Баланс:</small> <strong>${formatNumber(sec.balance)}</strong></div>
+                                    <div><small>Заблокировано:</small> <strong>${formatNumber(sec.blocked)}</strong></div>
+                                    <div><small>Тип:</small> ${sec.instrument_type}</div>
+                                </div>
+                            `;
+                        });
+                    }
+                    
+                    html += '</div></div>';
+                    container.innerHTML = html;
+                } else {
+                    container.innerHTML = `<div class="error-message">Ошибка: ${data.error}</div>`;
+                }
+            } catch (error) {
+                container.innerHTML = `<div class="error-message">Ошибка: ${error.message}</div>`;
+            }
+        }
+
+        // Загрузка операций
+        async function loadOperations(accountId) {
+            if (!accountId) return;
+            
+            const days = document.getElementById('operationsDaysSelect').value;
+            const container = document.getElementById('operationsContainer');
+            container.innerHTML = '<div class="loading"><i class="bi bi-arrow-repeat spin"></i> Загрузка операций...</div>';
+            
+            try {
+                const response = await fetch(`/api/operations/${accountId}?days=${days}`);
+                const data = await response.json();
+                
+                if (data.success) {
+                    if (data.operations.length === 0) {
+                        container.innerHTML = '<div class="text-center text-muted">Операций нет</div>';
+                    } else {
+                        let html = '<div class="table-responsive"><table class="table table-striped"><thead><tr><th>Дата</th><th>Тип</th><th>Инструмент</th><th>Сумма</th><th>Статус</th></tr></thead><tbody>';
+                        data.operations.forEach(op => {
+                            const paymentClass = op.payment >= 0 ? 'positive' : 'negative';
+                            html += `
+                                <tr>
+                                    <td>${new Date(op.date).toLocaleString('ru-RU')}</td>
+                                    <td>${op.operation_type}</td>
+                                    <td>${op.name || op.ticker || op.figi}</td>
+                                    <td class="${paymentClass}">${formatCurrency(op.payment)}</td>
+                                    <td>${op.state}</td>
+                                </tr>
+                            `;
+                        });
+                        html += '</tbody></table></div>';
+                        container.innerHTML = html;
+                    }
+                } else {
+                    container.innerHTML = `<div class="error-message">Ошибка: ${data.error}</div>`;
+                }
+            } catch (error) {
+                container.innerHTML = `<div class="error-message">Ошибка: ${error.message}</div>`;
+            }
+        }
+
+        // Загрузка заявок
+        async function loadOrders(accountId) {
+            if (!accountId) return;
+            
+            const container = document.getElementById('ordersContainer');
+            container.innerHTML = '<div class="loading"><i class="bi bi-arrow-repeat spin"></i> Загрузка заявок...</div>';
+            
+            try {
+                const response = await fetch(`/api/orders/${accountId}`);
+                const data = await response.json();
+                
+                if (data.success) {
+                    if (data.orders.length === 0) {
+                        container.innerHTML = '<div class="text-center text-muted">Заявок нет</div>';
+                    } else {
+                        let html = '<div class="table-responsive"><table class="table table-striped"><thead><tr><th>Дата</th><th>Инструмент</th><th>Направление</th><th>Цена</th><th>Лотов</th><th>Статус</th></tr></thead><tbody>';
+                        data.orders.forEach(order => {
+                            html += `
+                                <tr>
+                                    <td>${new Date(order.order_date).toLocaleString('ru-RU')}</td>
+                                    <td>${order.name || order.ticker || order.figi}</td>
+                                    <td>${order.direction}</td>
+                                    <td>${formatCurrency(order.initial_order_price)}</td>
+                                    <td>${order.lots_requested} / ${order.lots_executed}</td>
+                                    <td>${order.execution_report_status}</td>
+                                </tr>
+                            `;
+                        });
+                        html += '</tbody></table></div>';
+                        container.innerHTML = html;
+                    }
+                } else {
+                    container.innerHTML = `<div class="error-message">Ошибка: ${data.error}</div>`;
+                }
+            } catch (error) {
+                container.innerHTML = `<div class="error-message">Ошибка: ${error.message}</div>`;
+            }
+        }
+
+        // Пополнение счета
+        async function payIn() {
+            if (!currentAccountId) {
+                alert('Выберите аккаунт');
+                return;
+            }
+            
+            const amount = parseFloat(document.getElementById('payinAmount').value);
+            const currency = document.getElementById('payinCurrency').value;
+            const resultDiv = document.getElementById('payinResult');
+            
+            if (!amount || amount <= 0) {
+                resultDiv.innerHTML = '<div class="error-message">Введите корректную сумму</div>';
+                return;
+            }
+            
+            resultDiv.innerHTML = '<div class="loading">Пополнение счета...</div>';
+            
+            try {
+                const response = await fetch('/api/account/pay_in', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        account_id: currentAccountId,
+                        amount: amount,
+                        currency: currency
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    resultDiv.innerHTML = `<div class="alert alert-success"><strong>Успешно!</strong> Счет пополнен. Баланс: ${formatCurrency(data.balance)} ${data.currency.toUpperCase()}</div>`;
+                    // Перезагружаем портфель
+                    loadPortfolio(currentAccountId);
+                    loadDetailedPositions(currentAccountId);
+                } else {
+                    resultDiv.innerHTML = `<div class="error-message">Ошибка: ${data.error}</div>`;
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `<div class="error-message">Ошибка: ${error.message}</div>`;
+            }
+        }
+
+        document.getElementById('refreshBtn').addEventListener('click', function() {
+            loadAccounts();
+        });
+
+        document.getElementById('createAccountBtn').addEventListener('click', createAccount);
+
+        document.getElementById('loadChartBtn').addEventListener('click', loadChart);
+        
+        // Бэктест стратегии
+        async function runBacktest() {
+            const figi = document.getElementById('strategyFigi').value.trim();
+            if (!figi) {
+                alert('Введите FIGI или тикер');
+                return;
+            }
+            
+            const resultsDiv = document.getElementById('backtestResults');
+            resultsDiv.innerHTML = '<div class="text-center"><i class="bi bi-arrow-repeat spin"></i> Запуск тестирования...</div>';
+            
+            try {
+                const payload = {
+                    figi: figi,
+                    strategy_type: document.getElementById('strategyType').value,
+                    days: parseInt(document.getElementById('strategyDays').value),
+                    interval: document.getElementById('strategyInterval').value,
+                    initial_balance: parseFloat(document.getElementById('strategyInitialBalance').value),
+                    commission: parseFloat(document.getElementById('strategyCommission').value),
+                    strategy_params: {
+                        kama_len: parseInt(document.getElementById('kamaLen').value),
+                        kama_fast: parseInt(document.getElementById('kamaFast').value),
+                        kama_slow: parseInt(document.getElementById('kamaSlow').value),
+                        entry_mult: parseFloat(document.getElementById('entryMult').value),
+                        exit_mult: parseFloat(document.getElementById('exitMult').value),
+                        atr_len: parseInt(document.getElementById('atrLen').value),
+                        atr_sl_mult: parseFloat(document.getElementById('atrSlMult').value),
+                        atr_phase_len: parseInt(document.getElementById('atrPhaseLen').value),
+                        atr_phase_mult: 1.0,
+                        body_atr_mult: 0.5,
+                    }
+                };
+                
+                const response = await fetch('/api/strategy/backtest', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    const result = data.result;
+                    const winRate = result.total_trades > 0 ? (result.winning_trades / result.total_trades * 100).toFixed(2) : 0;
+                    
+                    resultsDiv.innerHTML = `
+                        <div class="row">
+                            <div class="col-md-6">
+                                <h6>Общая статистика</h6>
+                                <table class="table table-sm">
+                                    <tr><td>Всего сделок:</td><td><strong>${result.total_trades}</strong></td></tr>
+                                    <tr><td>Прибыльных:</td><td class="positive"><strong>${result.winning_trades}</strong></td></tr>
+                                    <tr><td>Убыточных:</td><td class="negative"><strong>${result.losing_trades}</strong></td></tr>
+                                    <tr><td>Процент побед:</td><td><strong>${winRate}%</strong></td></tr>
+                                    <tr><td>Общая прибыль:</td><td class="${result.total_profit >= 0 ? 'positive' : 'negative'}"><strong>${formatCurrency(result.total_profit)} (${result.total_profit_pct.toFixed(2)}%)</strong></td></tr>
+                                    <tr><td>Финальный баланс:</td><td><strong>${formatCurrency(result.final_balance)}</strong></td></tr>
+                                    <tr><td>Max Drawdown:</td><td class="negative"><strong>${formatCurrency(result.max_drawdown)} (${result.max_drawdown_pct.toFixed(2)}%)</strong></td></tr>
+                                    <tr><td>Sharpe Ratio:</td><td><strong>${result.sharpe_ratio.toFixed(2)}</strong></td></tr>
+                                </table>
+                            </div>
+                        </div>
+                    `;
+                    
+                    // Показываем график кривой капитала
+                    if (result.equity_curve && result.equity_curve.length > 0) {
+                        const chartContainer = document.getElementById('backtestChartContainer');
+                        chartContainer.style.display = 'block';
+                        
+                        const chartDiv = document.getElementById('backtestChart');
+                        const times = Array.from({length: result.equity_curve.length}, (_, i) => i);
+                        
+                        const trace = {
+                            x: times,
+                            y: result.equity_curve,
+                            type: 'scatter',
+                            mode: 'lines',
+                            name: 'Капитал',
+                            line: {color: '#667eea', width: 2}
+                        };
+                        
+                        const layout = {
+                            title: 'Кривая капитала',
+                            xaxis: {title: 'Свеча'},
+                            yaxis: {title: 'Баланс (₽)'},
+                            plot_bgcolor: 'rgba(0,0,0,0)',
+                            paper_bgcolor: 'rgba(0,0,0,0)',
+                            height: 400
+                        };
+                        
+                        Plotly.newPlot('backtestChart', [trace], layout, {responsive: true});
+                    }
+                    
+                    // Показываем таблицу сделок
+                    if (result.trades && result.trades.length > 0) {
+                        const tradesContainer = document.getElementById('backtestTradesContainer');
+                        tradesContainer.style.display = 'block';
+                        
+                        const tbody = document.querySelector('#backtestTradesTable tbody');
+                        tbody.innerHTML = '';
+                        
+                        result.trades.forEach(trade => {
+                            const row = document.createElement('tr');
+                            const profitClass = trade.profit >= 0 ? 'positive' : 'negative';
+                            row.innerHTML = `
+                                <td>${new Date(trade.entry_time).toLocaleString('ru-RU')}</td>
+                                <td>${trade.exit_time ? new Date(trade.exit_time).toLocaleString('ru-RU') : '-'}</td>
+                                <td>${formatCurrency(trade.entry_price)}</td>
+                                <td>${trade.exit_price ? formatCurrency(trade.exit_price) : '-'}</td>
+                                <td class="${profitClass}">${trade.profit !== null ? formatCurrency(trade.profit) : '-'}</td>
+                                <td class="${profitClass}">${trade.profit_pct !== null ? trade.profit_pct.toFixed(2) + '%' : '-'}</td>
+                            `;
+                            tbody.appendChild(row);
+                        });
+                    }
+                } else {
+                    resultsDiv.innerHTML = `<div class="alert alert-danger">Ошибка: ${data.error}</div>`;
+                }
+            } catch (error) {
+                resultsDiv.innerHTML = `<div class="alert alert-danger">Ошибка: ${error.message}</div>`;
+            }
+        }
+        
+        document.getElementById('runBacktestBtn').addEventListener('click', runBacktest);
+        
+        // Переключение между методами оптимизации
+        document.getElementById('optimizeMethod').addEventListener('change', function() {
+            if (this.value === 'genetic') {
+                document.getElementById('geneticParams').style.display = 'block';
+                document.getElementById('gridParams').style.display = 'none';
+            } else {
+                document.getElementById('geneticParams').style.display = 'none';
+                document.getElementById('gridParams').style.display = 'block';
+            }
+        });
+        
+        // Обучение стратегии
+        async function optimizeStrategy() {
+            const figi = document.getElementById('optimizeFigi').value.trim();
+            if (!figi) {
+                alert('Введите FIGI или тикер');
+                return;
+            }
+            
+            const resultsDiv = document.getElementById('optimizeResults');
+            const progressDiv = document.getElementById('optimizeProgress');
+            const progressBar = document.getElementById('optimizeProgressBar');
+            const statusText = document.getElementById('optimizeStatus');
+            
+            progressDiv.style.display = 'block';
+            progressBar.style.width = '10%';
+            statusText.textContent = 'Загрузка исторических данных...';
+            resultsDiv.innerHTML = '<div class="text-center"><i class="bi bi-arrow-repeat spin"></i> Запуск обучения...</div>';
+            
+            try {
+                const payload = {
+                    figi: figi,
+                    method: document.getElementById('optimizeMethod').value,
+                    years: parseInt(document.getElementById('optimizeYears').value),
+                    initial_balance: parseFloat(document.getElementById('optimizeInitialBalance').value),
+                    commission: parseFloat(document.getElementById('optimizeCommission').value),
+                };
+                
+                if (payload.method === 'genetic') {
+                    payload.population_size = parseInt(document.getElementById('populationSize').value);
+                    payload.generations = parseInt(document.getElementById('generations').value);
+                } else {
+                    payload.max_iterations = parseInt(document.getElementById('maxIterations').value);
+                }
+                
+                progressBar.style.width = '30%';
+                statusText.textContent = 'Оптимизация параметров...';
+                
+                const response = await fetch('/api/strategy/optimize', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                
+                progressBar.style.width = '90%';
+                statusText.textContent = 'Завершение...';
+                
+                const data = await response.json();
+                
+                progressDiv.style.display = 'none';
+                
+                if (data.success) {
+                    const params = data.optimized_params;
+                    const metrics = data.metrics;
+                    
+                    resultsDiv.innerHTML = `
+                        <div class="alert alert-success">
+                            <h6><i class="bi bi-check-circle"></i> Обучение завершено!</h6>
+                            <p>Стратегия сохранена: <code>${data.strategy_file}</code></p>
+                        </div>
+                        <h6>Оптимальные параметры:</h6>
+                        <table class="table table-sm table-bordered">
+                            <tr><td>KAMA Length</td><td><strong>${params.kama_len}</strong></td></tr>
+                            <tr><td>Fast/Slow</td><td><strong>${params.kama_fast}/${params.kama_slow}</strong></td></tr>
+                            <tr><td>Entry Mult</td><td><strong>${params.entry_mult}</strong></td></tr>
+                            <tr><td>Exit Mult</td><td><strong>${params.exit_mult}</strong></td></tr>
+                            <tr><td>ATR Length</td><td><strong>${params.atr_len}</strong></td></tr>
+                            <tr><td>ATR SL Mult</td><td><strong>${params.atr_sl_mult}</strong></td></tr>
+                        </table>
+                        <h6 class="mt-3">Метрики на обучающей выборке:</h6>
+                        <table class="table table-sm">
+                            <tr><td>Прибыль:</td><td class="positive"><strong>${metrics.train_profit_pct.toFixed(2)}%</strong></td></tr>
+                            <tr><td>Sharpe Ratio:</td><td><strong>${metrics.train_sharpe_ratio.toFixed(2)}</strong></td></tr>
+                            <tr><td>Win Rate:</td><td><strong>${metrics.train_win_rate.toFixed(2)}%</strong></td></tr>
+                            <tr><td>Max Drawdown:</td><td class="negative"><strong>${metrics.train_max_drawdown_pct.toFixed(2)}%</strong></td></tr>
+                            <tr><td>Сделок:</td><td><strong>${metrics.train_total_trades}</strong></td></tr>
+                        </table>
+                        <h6 class="mt-3">Метрики на валидационной выборке:</h6>
+                        <table class="table table-sm">
+                            <tr><td>Прибыль:</td><td class="${metrics.val_profit_pct >= 0 ? 'positive' : 'negative'}"><strong>${metrics.val_profit_pct.toFixed(2)}%</strong></td></tr>
+                            <tr><td>Sharpe Ratio:</td><td><strong>${metrics.val_sharpe_ratio.toFixed(2)}</strong></td></tr>
+                            <tr><td>Win Rate:</td><td><strong>${metrics.val_win_rate.toFixed(2)}%</strong></td></tr>
+                            <tr><td>Max Drawdown:</td><td class="negative"><strong>${metrics.val_max_drawdown_pct.toFixed(2)}%</strong></td></tr>
+                            <tr><td>Сделок:</td><td><strong>${metrics.val_total_trades}</strong></td></tr>
+                        </table>
+                    `;
+                } else {
+                    resultsDiv.innerHTML = `<div class="alert alert-danger">Ошибка: ${data.error}</div>`;
+                }
+            } catch (error) {
+                progressDiv.style.display = 'none';
+                resultsDiv.innerHTML = `<div class="alert alert-danger">Ошибка: ${error.message}</div>`;
+            }
+        }
+        
+        document.getElementById('optimizeBtn').addEventListener('click', optimizeStrategy);
+        
+        // Загрузка обученной стратегии
+        async function loadStrategy() {
+            const figi = document.getElementById('autoTradeFigi').value.trim();
+            if (!figi) {
+                alert('Введите FIGI или тикер');
+                return;
+            }
+            
+            const infoDiv = document.getElementById('loadedStrategyInfo');
+            infoDiv.innerHTML = '<div class="text-center"><i class="bi bi-arrow-repeat spin"></i> Загрузка...</div>';
+            
+            try {
+                const response = await fetch(`/api/strategy/load/${encodeURIComponent(figi)}`);
+                const data = await response.json();
+                
+                if (data.success) {
+                    const params = data.params;
+                    infoDiv.innerHTML = `
+                        <div class="alert alert-success">
+                            <h6><i class="bi bi-check-circle"></i> Стратегия загружена</h6>
+                            <p><small>Последнее обучение: ${new Date(data.last_retrain_date).toLocaleString('ru-RU')}</small></p>
+                            ${data.should_retrain ? '<p class="text-warning mb-0"><small>Рекомендуется переобучение</small></p>' : ''}
+                        </div>
+                        <h6>Параметры:</h6>
+                        <table class="table table-sm table-bordered">
+                            <tr><td>KAMA:</td><td>${params.kama_len} (${params.kama_fast}/${params.kama_slow})</td></tr>
+                            <tr><td>Entry/Exit:</td><td>${params.entry_mult}/${params.exit_mult}</td></tr>
+                            <tr><td>ATR:</td><td>${params.atr_len} (SL: ${params.atr_sl_mult}x)</td></tr>
+                            <tr><td>Fitness:</td><td>${params.fitness_score.toFixed(4)}</td></tr>
+                            <tr><td>Прибыль (train):</td><td class="positive">${params.total_profit_pct.toFixed(2)}%</td></tr>
+                            <tr><td>Win Rate:</td><td>${params.win_rate.toFixed(2)}%</td></tr>
+                        </table>
+                    `;
+                } else {
+                    infoDiv.innerHTML = `<div class="alert alert-warning">${data.error}. Обучите стратегию сначала.</div>`;
+                }
+            } catch (error) {
+                infoDiv.innerHTML = `<div class="alert alert-danger">Ошибка: ${error.message}</div>`;
+            }
+        }
+        
+        // Загрузка списка стратегий (общая функция)
+        async function loadStrategiesIntoSelect(selectElement, includeEmpty = true) {
+            if (!selectElement) {
+                console.warn('loadStrategiesIntoSelect: selectElement не найден');
+                return;
+            }
+            
+            // Сохраняем текущее выбранное значение
+            const currentValue = selectElement.value;
+            
+            // Показываем индикатор загрузки
+            const loadingOption = document.createElement('option');
+            loadingOption.value = '';
+            loadingOption.textContent = 'Загрузка...';
+            loadingOption.disabled = true;
+            selectElement.innerHTML = '';
+            selectElement.appendChild(loadingOption);
+            
+            try {
+                const response = await fetch('/api/strategy/list');
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
+                const data = await response.json();
+                console.log('Загружено стратегий:', data.strategies ? data.strategies.length : 0);
+                
+                // Очищаем список
+                selectElement.innerHTML = '';
+                
+                if (data.success && data.strategies && data.strategies.length > 0) {
+                    // Добавляем пустой вариант, если нужно
+                    if (includeEmpty) {
+                        const emptyOption = document.createElement('option');
+                        emptyOption.value = '';
+                        emptyOption.textContent = 'Выберите стратегию...';
+                        selectElement.appendChild(emptyOption);
+                    }
+                    
+                    // Показываем все стратегии для всех списков
+                    // Группируем только если нужно, но для автоторговли показываем все версии
+                    let strategiesToShow = [];
+                    
+                    // Проверяем, это список для обучения или автоторговли
+                    const isOptimizeSelect = selectElement.id === 'optimizeStrategySelect';
+                    const isAutoTradeSelect = selectElement.id === 'autoTradeStrategySelect';
+                    
+                    if (isOptimizeSelect || isAutoTradeSelect) {
+                        // Для обучения и автоторговли показываем все стратегии, сортируем по дате (новые первыми)
+                        strategiesToShow = data.strategies.filter(s => s && s.figi).sort((a, b) => {
+                            const dateA = a.timestamp || a.last_retrain_date || '';
+                            const dateB = b.timestamp || b.last_retrain_date || '';
+                            return dateB.localeCompare(dateA); // Новые первыми
+                        });
+                        console.log(`Показано ${strategiesToShow.length} стратегий для ${isOptimizeSelect ? 'обучения' : 'автоторговли'}`);
+                    } else {
+                        // Для других списков группируем по FIGI, оставляя последнюю версию
+                        const strategiesByFigi = {};
+                        data.strategies.forEach(strategy => {
+                            if (!strategy || !strategy.figi) {
+                                console.warn('Пропущена стратегия без FIGI:', strategy);
+                                return;
+                            }
+                            
+                            const figi = strategy.figi;
+                            if (!strategiesByFigi[figi] || 
+                                (strategy.timestamp && strategiesByFigi[figi].timestamp && 
+                                 strategy.timestamp > strategiesByFigi[figi].timestamp)) {
+                                strategiesByFigi[figi] = strategy;
+                            }
+                        });
+                        
+                        strategiesToShow = Object.values(strategiesByFigi);
+                    }
+                    
+                    // Сортируем по FIGI для удобства
+                    const sortedStrategies = strategiesToShow.sort((a, b) => {
+                        return (a.figi || '').localeCompare(b.figi || '');
+                    });
+                    
+                    sortedStrategies.forEach(strategy => {
+                        const option = document.createElement('option');
+                        option.value = strategy.figi;
+                        
+                        // Безопасное получение значений
+                        const profit = (strategy.total_profit_pct !== undefined && strategy.total_profit_pct !== null) 
+                            ? parseFloat(strategy.total_profit_pct) : 0;
+                        const winRate = (strategy.win_rate !== undefined && strategy.win_rate !== null) 
+                            ? parseFloat(strategy.win_rate) : 0;
+                        const fitnessScore = (strategy.fitness_score !== undefined && strategy.fitness_score !== null) 
+                            ? parseFloat(strategy.fitness_score) : 0;
+                        
+                        // Получаем название стратегии, если есть
+                        const strategyName = strategy.name || strategy.strategy_name || '';
+                        const namePart = strategyName ? `${strategyName} (` : '';
+                        const nameSuffix = strategyName ? ')' : '';
+                        
+                        // Определяем статус стратегии
+                        let status = '';
+                        if (strategy.has_pinescript) {
+                            status = ' [PineScript]';
+                        } else if (fitnessScore === 0 && profit === 0) {
+                            status = ' [Не обучена]';
+                        }
+                        
+                        // Добавляем информацию о версии, если есть timestamp и это список автоторговли или обучения
+                        let versionInfo = '';
+                        if (strategy.timestamp && (isAutoTradeSelect || isOptimizeSelect)) {
+                            try {
+                                // Парсим timestamp в формате YYYYMMDD_HHMMSS
+                                const ts = strategy.timestamp;
+                                if (ts && ts.length >= 15) {
+                                    const dateStr = `${ts.substring(0,4)}-${ts.substring(4,6)}-${ts.substring(6,8)} ${ts.substring(9,11)}:${ts.substring(11,13)}`;
+                                    versionInfo = ` [${dateStr}]`;
+                                }
+                            } catch (e) {
+                                // Игнорируем ошибки парсинга
+                            }
+                        }
+                        
+                        // Формируем текст опции
+                        const profitStr = profit.toFixed(2);
+                        const winRateStr = winRate.toFixed(2);
+                        option.textContent = `${namePart}${strategy.figi}${nameSuffix}${status}${versionInfo} - Прибыль: ${profitStr}%, Win Rate: ${winRateStr}%`;
+                        
+                        // Сохраняем дополнительные данные
+                        option.dataset.file = strategy.file || '';
+                        option.dataset.timestamp = strategy.timestamp || '';
+                        option.dataset.hasPinescript = strategy.has_pinescript ? 'true' : 'false';
+                        option.dataset.name = strategyName;
+                        option.dataset.figi = strategy.figi; // Сохраняем FIGI отдельно для извлечения
+                        
+                        selectElement.appendChild(option);
+                    });
+                    
+                    // Восстанавливаем выбранное значение, если оно было
+                    if (currentValue && selectElement.querySelector(`option[value="${currentValue}"]`)) {
+                        selectElement.value = currentValue;
+                    }
+                    
+                    console.log(`Загружено ${sortedStrategies.length} уникальных стратегий в список`);
+                } else {
+                    // Нет стратегий
+                    const emptyOption = document.createElement('option');
+                    emptyOption.value = '';
+                    if (includeEmpty) {
+                        emptyOption.textContent = 'Нет сохраненных стратегий. Обучите стратегию сначала.';
+                    } else {
+                        emptyOption.textContent = 'Нет стратегий';
+                    }
+                    selectElement.appendChild(emptyOption);
+                }
+            } catch (error) {
+                console.error('Ошибка загрузки стратегий:', error);
+                selectElement.innerHTML = '';
+                const errorOption = document.createElement('option');
+                errorOption.value = '';
+                errorOption.textContent = `Ошибка загрузки: ${error.message}`;
+                errorOption.disabled = true;
+                selectElement.appendChild(errorOption);
+            }
+        }
+        
+        // Загрузка списка стратегий для автоторговли (использует общую функцию)
+        async function loadStrategiesList() {
+            const select = document.getElementById('autoTradeStrategySelect');
+            if (!select) {
+                console.warn('Элемент autoTradeStrategySelect не найден, возможно вкладка еще не загружена');
+                return;
+            }
+            console.log('Загрузка списка стратегий для автоторговли');
+            await loadStrategiesIntoSelect(select, true);
+        }
+        
+        // Загрузка списка стратегий для обучения
+        async function loadOptimizeStrategiesList() {
+            const select = document.getElementById('optimizeStrategySelect');
+            await loadStrategiesIntoSelect(select, true);
+        }
+        
+        document.getElementById('loadStrategiesBtn')?.addEventListener('click', loadStrategiesList);
+        document.getElementById('refreshOptimizeStrategiesBtn')?.addEventListener('click', loadOptimizeStrategiesList);
+        
+        // При выборе стратегии в списке обучения, заполняем FIGI
+        document.getElementById('optimizeStrategySelect')?.addEventListener('change', function() {
+            const selectedValue = this.value;
+            if (selectedValue) {
+                document.getElementById('optimizeFigi').value = selectedValue;
+            }
+        });
+        
+        // Загружаем список стратегий при открытии вкладки обучения
+        document.getElementById('optimize-tab')?.addEventListener('shown.bs.tab', function() {
+            loadOptimizeStrategiesList();
+        });
+        
+        // Загружаем список стратегий при открытии вкладки автоторговли
+        document.getElementById('trade-auto-tab')?.addEventListener('shown.bs.tab', function() {
+            loadStrategiesList();
+        });
+        
+        // При выборе стратегии загружаем ее детали
+        document.getElementById('autoTradeStrategySelect')?.addEventListener('change', async function() {
+            const selectedValue = this.value;
+            if (!selectedValue) {
+                document.getElementById('autoTradeFigi').value = '';
+                document.getElementById('loadedStrategyInfo').innerHTML = '<p class="text-muted mb-0">Выберите стратегию</p>';
+                return;
+            }
+            
+            // Извлекаем FIGI из значения (может быть в формате FIGI_timestamp)
+            let figi = selectedValue;
+            if (selectedValue.includes('_')) {
+                const parts = selectedValue.split('_');
+                // Проверяем, является ли последняя часть timestamp (формат YYYYMMDD_HHMMSS)
+                if (parts.length >= 2 && parts[parts.length - 1].length === 6) {
+                    figi = parts.slice(0, -1).join('_'); // Берем все части кроме последней
+                } else {
+                    // Или используем data-figi из option
+                    const selectedOption = this.options[this.selectedIndex];
+                    figi = selectedOption.dataset.figi || selectedValue;
+                }
+            }
+            
+            document.getElementById('autoTradeFigi').value = figi;
+            await loadStrategy();
+        });
+        
+        // Загрузка деталей стратегии
+        async function loadStrategy() {
+            const figi = document.getElementById('autoTradeFigi').value.trim();
+            if (!figi) {
+                return;
+            }
+            
+            const infoDiv = document.getElementById('loadedStrategyInfo');
+            infoDiv.innerHTML = '<div class="text-center"><i class="bi bi-arrow-repeat spin"></i> Загрузка...</div>';
+            
+            try {
+                const response = await fetch(`/api/strategy/load/${encodeURIComponent(figi)}`);
+                const data = await response.json();
+                
+                if (data.success) {
+                    const params = data.params;
+                    infoDiv.innerHTML = `
+                        <div class="alert alert-success">
+                            <h6><i class="bi bi-check-circle"></i> Стратегия загружена</h6>
+                            <p><small>Последнее обучение: ${new Date(data.last_retrain_date).toLocaleString('ru-RU')}</small></p>
+                            ${data.should_retrain ? '<p class="text-warning mb-0"><small>Рекомендуется переобучение</small></p>' : ''}
+                        </div>
+                        <h6>Параметры:</h6>
+                        <table class="table table-sm table-bordered">
+                            <tr><td>KAMA:</td><td>${params.kama_len} (${params.kama_fast}/${params.kama_slow})</td></tr>
+                            <tr><td>Entry/Exit:</td><td>${params.entry_mult}/${params.exit_mult}</td></tr>
+                            <tr><td>ATR:</td><td>${params.atr_len} (SL: ${params.atr_sl_mult}x)</td></tr>
+                            <tr><td>Fitness:</td><td>${params.fitness_score.toFixed(4)}</td></tr>
+                            <tr><td>Прибыль (train):</td><td class="positive">${params.total_profit_pct.toFixed(2)}%</td></tr>
+                            <tr><td>Win Rate:</td><td>${params.win_rate.toFixed(2)}%</td></tr>
+                        </table>
+                    `;
+                } else {
+                    infoDiv.innerHTML = `<div class="alert alert-warning">${data.error}</div>`;
+                }
+            } catch (error) {
+                infoDiv.innerHTML = `<div class="alert alert-danger">Ошибка: ${error.message}</div>`;
+            }
+        }
+        
+        // Запуск автоторговли
+        async function startAutoTrade() {
+            if (!currentAccountId) {
+                alert('Выберите аккаунт');
+                return;
+            }
+            
+            const figi = document.getElementById('autoTradeFigi').value.trim();
+            if (!figi) {
+                alert('Выберите стратегию');
+                return;
+            }
+            
+            const interval = document.getElementById('autoTradeInterval').value;
+            const tradePercent = parseFloat(document.getElementById('tradePercent').value);
+            
+            const statusDiv = document.getElementById('autoTradeStatus');
+            statusDiv.innerHTML = '<div class="text-center"><i class="bi bi-arrow-repeat spin"></i> Запуск...</div>';
+            
+            try {
+                const response = await fetch('/api/strategy/auto_trade/start', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        figi: figi,
+                        account_id: currentAccountId,
+                        interval: interval,
+                        trade_percent: tradePercent,
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    statusDiv.innerHTML = `<div class="alert alert-success"><strong>Автоторговля запущена!</strong><br>Статус: ${data.status.is_running ? 'Работает' : 'Остановлена'}</div>`;
+                    document.getElementById('startAutoTradeBtn').disabled = true;
+                    document.getElementById('stopAutoTradeBtn').disabled = false;
+                    
+                    // Начинаем обновление статуса
+                    startStatusUpdates();
+                    startLogsUpdates(); // Начинаем обновление логов
+                    refreshAutoTradeLogs(); // Сразу загружаем логи
+                    refreshAutoTradeChart(); // Загружаем график
+                    startChartUpdates(); // Начинаем обновление графика
+                } else {
+                    statusDiv.innerHTML = `<div class="alert alert-danger">Ошибка: ${data.error}</div>`;
+                }
+            } catch (error) {
+                statusDiv.innerHTML = `<div class="alert alert-danger">Ошибка: ${error.message}</div>`;
+            }
+        }
+        
+        // Остановка автоторговли
+        async function stopAutoTrade() {
+            if (!currentAccountId) {
+                return;
+            }
+            
+            const figi = document.getElementById('autoTradeFigi').value.trim();
+            if (!figi) {
+                return;
+            }
+            
+            const statusDiv = document.getElementById('autoTradeStatus');
+            
+            try {
+                const response = await fetch('/api/strategy/auto_trade/stop', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        figi: figi,
+                        account_id: currentAccountId,
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    statusDiv.innerHTML = '<div class="alert alert-info">Автоторговля остановлена</div>';
+                    document.getElementById('startAutoTradeBtn').disabled = false;
+                    document.getElementById('stopAutoTradeBtn').disabled = true;
+                    stopLogsUpdates(); // Останавливаем обновление логов
+                } else {
+                    statusDiv.innerHTML = `<div class="alert alert-warning">${data.error}</div>`;
+                }
+            } catch (error) {
+                statusDiv.innerHTML = `<div class="alert alert-danger">Ошибка: ${error.message}</div>`;
+            }
+        }
+        
+        // Обновление статуса
+        let statusUpdateInterval = null;
+        
+        function startStatusUpdates() {
+            if (statusUpdateInterval) {
+                clearInterval(statusUpdateInterval);
+            }
+            
+            statusUpdateInterval = setInterval(async () => {
+                if (!currentAccountId) return;
+                
+                const figi = document.getElementById('autoTradeFigi').value.trim();
+                if (!figi) return;
+                
+                try {
+                    const response = await fetch(`/api/strategy/auto_trade/status?figi=${encodeURIComponent(figi)}&account_id=${encodeURIComponent(currentAccountId)}`);
+                    const data = await response.json();
+                    
+                    if (data.success && data.status.is_running) {
+                        const statusDiv = document.getElementById('autoTradeStatus');
+                        statusDiv.innerHTML = `
+                            <div class="alert alert-success">
+                                <strong>Автоторговля работает</strong><br>
+                                Позиция: ${data.status.position || 0}<br>
+                                Свечей в истории: ${data.status.candles_count || 0}<br>
+                                Последний сигнал: ${data.status.last_signal ? data.status.last_signal.action + ' @ ' + data.status.last_signal.price : 'Нет'}
+                            </div>
+                        `;
+                    } else {
+                        document.getElementById('startAutoTradeBtn').disabled = false;
+                        document.getElementById('stopAutoTradeBtn').disabled = true;
+                    }
+                } catch (error) {
+                    console.error('Ошибка обновления статуса:', error);
+                }
+            }, 5000); // Обновляем каждые 5 секунд
+        }
+        
+        document.getElementById('startAutoTradeBtn').addEventListener('click', startAutoTrade);
+        document.getElementById('stopAutoTradeBtn').addEventListener('click', stopAutoTrade);
+        
+        // Загружаем список стратегий при загрузке страницы
+        loadStrategiesList();
+        
+        document.getElementById('loadOperationsBtn').addEventListener('click', function() {
+            if (currentAccountId) loadOperations(currentAccountId);
+        });
+        
+        document.getElementById('loadOrdersBtn').addEventListener('click', function() {
+            if (currentAccountId) loadOrders(currentAccountId);
+        });
+        
+        document.getElementById('payinBtn').addEventListener('click', payIn);
+
+        // Получение текущей цены
+        async function getCurrentPrice(figi) {
+            if (!figi) {
+                alert('Введите FIGI или тикер');
+                return;
+            }
+            
+            const priceDiv = document.getElementById('currentPrice');
+            priceDiv.innerHTML = '<small>Загрузка...</small>';
+            
+            try {
+                const response = await fetch(`/api/last_price/${figi}`);
+                const data = await response.json();
+                
+                if (data.success) {
+                    priceDiv.innerHTML = `<div class="alert alert-success mb-0"><strong>Текущая цена:</strong> ${formatCurrency(data.price)}</div>`;
+                    // Устанавливаем цену в поле для лимитного ордера
+                    document.getElementById('tradingPrice').value = data.price.toFixed(2);
+                } else {
+                    priceDiv.innerHTML = `<div class="alert alert-danger mb-0">Ошибка: ${data.error}</div>`;
+                }
+            } catch (error) {
+                priceDiv.innerHTML = `<div class="alert alert-danger mb-0">Ошибка: ${error.message}</div>`;
+            }
+        }
+
+        // Загрузка информации об инструменте
+        async function loadInstrumentInfo(figi) {
+            if (!figi) return;
+            
+            try {
+                const response = await fetch(`/api/instrument/${encodeURIComponent(figi)}`);
+                const data = await response.json();
+                
+                if (data.success) {
+                    const infoDiv = document.getElementById('tradingInstrumentInfo');
+                    if (infoDiv) {
+                        infoDiv.innerHTML = `
+                            <strong>${data.name}</strong><br>
+                            Тикер: ${data.ticker} | FIGI: ${data.figi}<br>
+                            Лот: ${data.lot} | Валюта: ${data.currency.toUpperCase()}<br>
+                            Минимальный шаг цены: ${data.min_price_increment}
+                        `;
+                        infoDiv.style.display = 'block';
+                    }
+                    
+                    // Проверяем доступность торговли
+                    if (!data.buy_available_flag && !data.sell_available_flag) {
+                        alert('Торговля недоступна для этого инструмента');
+                        return false;
+                    }
+                    
+                    return data;
+                }
+            } catch (error) {
+                console.error('Error loading instrument info:', error);
+            }
+            return null;
+        }
+
+        // Создание ордера
+        async function createOrder() {
+            if (!currentAccountId) {
+                alert('Выберите аккаунт');
+                return;
+            }
+            
+            const figi = document.getElementById('tradingFigi').value.trim();
+            const quantity = parseInt(document.getElementById('tradingQuantity').value);
+            const direction = document.getElementById('tradingDirection').value;
+            const orderType = document.getElementById('tradingOrderType').value;
+            const price = parseFloat(document.getElementById('tradingPrice').value);
+            const resultDiv = document.getElementById('orderResult');
+            
+            if (!figi || quantity <= 0) {
+                resultDiv.innerHTML = '<div class="error-message">Заполните все поля</div>';
+                return;
+            }
+            
+            if (orderType === 'ORDER_TYPE_LIMIT' && (!price || price <= 0)) {
+                resultDiv.innerHTML = '<div class="error-message">Укажите цену для лимитного ордера</div>';
+                return;
+            }
+            
+            resultDiv.innerHTML = '<div class="loading">Создание заявки...</div>';
+            
+            try {
+                const orderData = {
+                    account_id: currentAccountId,
+                    figi: figi,
+                    quantity: quantity,
+                    direction: direction,
+                    order_type: orderType
+                };
+                
+                if (orderType === 'ORDER_TYPE_LIMIT') {
+                    orderData.price = price;
+                }
+                
+                const response = await fetch('/api/order/create', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(orderData)
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    resultDiv.innerHTML = `<div class="alert alert-success"><strong>Успешно!</strong> Заявка создана. ID: ${data.order_id}<br>Статус: ${data.execution_report_status}</div>`;
+                    // Обновляем все данные
+                    if (currentAccountId) {
+                        loadOrders(currentAccountId);
+                        loadPortfolio(currentAccountId);
+                        loadBalance(currentAccountId);
+                        loadDetailedPositions(currentAccountId);
+                    }
+                } else {
+                    resultDiv.innerHTML = `<div class="error-message">Ошибка: ${data.error}</div>`;
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `<div class="error-message">Ошибка: ${error.message}</div>`;
+            }
+        }
+
+        // Показ/скрытие поля цены
+        document.getElementById('tradingOrderType').addEventListener('change', function() {
+            const priceDiv = document.getElementById('tradingPriceDiv');
+            if (this.value === 'ORDER_TYPE_LIMIT') {
+                priceDiv.style.display = 'block';
+            } else {
+                priceDiv.style.display = 'none';
+            }
+        });
+
+        document.getElementById('getPriceBtn').addEventListener('click', function() {
+            const figi = document.getElementById('tradingFigi').value.trim();
+            if (figi) getCurrentPrice(figi);
+        });
+
+        document.getElementById('createOrderBtn').addEventListener('click', createOrder);
+
+        // При смене аккаунта загружаем данные для активной вкладки
+        document.getElementById('accountSelect').addEventListener('change', function() {
+            currentAccountId = this.value;
+            if (currentAccountId) {
+                loadPortfolio(currentAccountId);
+                loadDetailedPositions(currentAccountId);
+            }
+        });
+
+        // Загрузка информации об инструменте при изменении FIGI
+        const tradingFigiInput = document.getElementById('tradingFigi');
+        if (tradingFigiInput) {
+            tradingFigiInput.addEventListener('blur', function() {
+                const figi = this.value.trim();
+                if (figi) {
+                    loadInstrumentInfo(figi);
+                }
+            });
+        }
+        
+        // Загрузка при старте
+        loadAccounts();
+        
+        // Загружаем стратегии при первом открытии вкладки (если она активна)
+        setTimeout(function() {
+            const allStrategiesPane = document.getElementById('all-strategies');
+            if (allStrategiesPane && (allStrategiesPane.classList.contains('active') || 
+                allStrategiesPane.classList.contains('show'))) {
+                console.log('Вкладка "Все стратегии" активна при загрузке страницы');
+                loadAllStrategies();
+            }
+        }, 1500);
+        
+        // Останавливаем автообновление при закрытии страницы
+        window.addEventListener('beforeunload', function() {
+            stopBalanceAutoRefresh();
+        });
+        
+        // Загрузка списка всех стратегий
+        let isLoadingStrategies = false;
+        async function loadAllStrategies() {
+            // Защита от повторных вызовов
+            if (isLoadingStrategies) {
+                console.log('Загрузка стратегий уже выполняется, пропускаем...');
+                return;
+            }
+            
+            const container = document.getElementById('strategiesListContainer');
+            if (!container) {
+                console.error('Контейнер strategiesListContainer не найден');
+                return;
+            }
+            
+            isLoadingStrategies = true;
+            container.innerHTML = '<div class="loading"><i class="bi bi-arrow-repeat spin"></i> Загрузка стратегий...</div>';
+            
+            try {
+                console.log('Отправляем запрос к /api/strategy/list');
+                const response = await fetch('/api/strategy/list');
+                console.log('Получен ответ, status:', response.status);
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
+                const data = await response.json();
+                console.log('Получены данные:', data);
+                console.log('Количество стратегий:', data.strategies ? data.strategies.length : 0);
+                
+                if (data.success) {
+                    if (!data.strategies || data.strategies.length === 0) {
+                        container.innerHTML = `
+                            <div class="alert alert-info">
+                                <i class="bi bi-info-circle"></i> Нет сохраненных стратегий. 
+                                <a href="#" onclick="document.getElementById('strategies-tab').click(); return false;">Обучите новую стратегию</a> или 
+                                <a href="#" onclick="document.getElementById('addStrategyBtn').click(); return false;">добавьте стратегию из кода</a>.
+                            </div>
+                        `;
+                    } else {
+                        console.log('Начинаем генерацию HTML для', data.strategies.length, 'стратегий');
+                        let html = '<div class="row">';
+                        data.strategies.forEach((strategy, index) => {
+                            console.log(`Обрабатываем стратегию ${index + 1}:`, strategy);
+                            console.log('Поля стратегии:', Object.keys(strategy));
+                            try {
+                                // Проверяем наличие всех полей
+                                const figi = strategy.figi || 'N/A';
+                                const file = strategy.file || 'N/A';
+                                const totalProfitPct = strategy.total_profit_pct !== undefined && strategy.total_profit_pct !== null ? strategy.total_profit_pct : 0;
+                                const winRate = strategy.win_rate !== undefined && strategy.win_rate !== null ? strategy.win_rate : 0;
+                                const fitnessScore = strategy.fitness_score !== undefined && strategy.fitness_score !== null ? strategy.fitness_score : 0;
+                                const lastRetrainDate = strategy.last_retrain_date || '';
+                                
+                                const profitClass = (totalProfitPct >= 0) ? 'text-success' : 'text-danger';
+                                const retrainBadge = strategy.should_retrain ? '<span class="badge bg-warning">Требует переобучения</span>' : '';
+                                const profitPct = totalProfitPct.toFixed(2);
+                                const winRateStr = winRate.toFixed(2);
+                                const fitnessScoreStr = fitnessScore.toFixed(4);
+                                const lastRetrainDateStr = lastRetrainDate ? new Date(lastRetrainDate).toLocaleDateString('ru-RU') : 'N/A';
+                                
+                                console.log(`Стратегия ${index + 1} обработана:`, {figi, profitPct, winRateStr, fitnessScoreStr});
+                                
+                                html += `
+                                <div class="col-md-6 mb-3">
+                                    <div class="card h-100">
+                                        <div class="card-body">
+                                            <h6 class="card-title">
+                                                ${figi}
+                                                ${retrainBadge}
+                                                ${strategy.has_pinescript ? '<span class="badge bg-info ms-2">PineScript</span>' : ''}
+                                            </h6>
+                                            <div class="mb-2">
+                                                <small class="text-muted">Файл:</small><br>
+                                                <code>${file}</code>
+                                            </div>
+                                            <div class="row mb-2">
+                                                <div class="col-6">
+                                                    <small class="text-muted">Прибыль:</small><br>
+                                                    <strong class="${profitClass}">${profitPct}%</strong>
+                                                </div>
+                                                <div class="col-6">
+                                                    <small class="text-muted">Win Rate:</small><br>
+                                                    <strong>${winRateStr}%</strong>
+                                                </div>
+                                            </div>
+                                            <div class="row mb-2">
+                                                <div class="col-6">
+                                                    <small class="text-muted">Fitness:</small><br>
+                                                    <strong>${fitnessScoreStr}</strong>
+                                                </div>
+                                                <div class="col-6">
+                                                    <small class="text-muted">Обучена:</small><br>
+                                                    <small>${lastRetrainDateStr}</small>
+                                                </div>
+                                            </div>
+                                            <div class="mt-3">
+                                                <button class="btn btn-sm btn-primary view-strategy-btn" data-figi="${figi}">
+                                                    <i class="bi bi-eye"></i> Просмотр
+                                                </button>
+                                                <button class="btn btn-sm btn-info load-strategy-btn" data-figi="${figi}">
+                                                    <i class="bi bi-download"></i> Загрузить
+                                                </button>
+                                                <button class="btn btn-sm btn-danger delete-strategy-btn" data-figi="${figi}" data-file="${file}">
+                                                    <i class="bi bi-trash"></i> Удалить
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            `;
+                            } catch (error) {
+                                console.error(`Ошибка при обработке стратегии ${index + 1}:`, error, strategy);
+                                html += `
+                                    <div class="col-md-6 mb-3">
+                                        <div class="card h-100">
+                                            <div class="card-body">
+                                                <div class="alert alert-warning">
+                                                    Ошибка отображения стратегии: ${error.message}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                `;
+                            }
+                        });
+                        html += '</div>';
+                        console.log('Сгенерированный HTML (первые 500 символов):', html.substring(0, 500));
+                        console.log('Длина HTML:', html.length);
+                        console.log('Контейнер до вставки:', container);
+                        console.log('Контейнер видим:', container.offsetParent !== null);
+                        
+                        // Проверяем родительские элементы и исправляем скрытые
+                        let parent = container.parentElement;
+                        let level = 0;
+                        while (parent && level < 10) {
+                            const computedStyle = window.getComputedStyle(parent);
+                            const display = computedStyle.display;
+                            const visibility = computedStyle.visibility;
+                            console.log(`Родитель ${level}:`, parent.tagName, parent.className, 'display:', display, 'visibility:', visibility);
+                            
+                            // Если родитель скрыт, делаем его видимым
+                            if (display === 'none' && !parent.id.includes('hidden') && !parent.classList.contains('d-none')) {
+                                console.log(`Исправляем скрытый родитель ${level}`);
+                                parent.style.display = 'block';
+                            }
+                            
+                            parent = parent.parentElement;
+                            level++;
+                        }
+                        
+                        // Проверяем вкладку
+                        const allStrategiesPane = document.getElementById('all-strategies');
+                        if (allStrategiesPane) {
+                            console.log('Вкладка all-strategies:', {
+                                classes: allStrategiesPane.className,
+                                display: window.getComputedStyle(allStrategiesPane).display,
+                                visibility: window.getComputedStyle(allStrategiesPane).visibility,
+                                hasActive: allStrategiesPane.classList.contains('active'),
+                                hasShow: allStrategiesPane.classList.contains('show')
+                            });
+                        }
+                        
+                        container.innerHTML = html;
+                        console.log('HTML вставлен в контейнер');
+                        console.log('Элементов в контейнере:', container.children.length);
+                        console.log('Внутренний HTML контейнера (первые 200 символов):', container.innerHTML.substring(0, 200));
+                        
+                        // Принудительно показываем контейнер и его родителей
+                        container.style.display = 'block';
+                        container.style.visibility = 'visible';
+                        container.style.opacity = '1';
+                        
+                        // Убеждаемся, что вкладка активна и видима
+                        if (allStrategiesPane) {
+                            // Удаляем класс fade, который может мешать
+                            allStrategiesPane.classList.remove('fade');
+                            allStrategiesPane.classList.add('show', 'active');
+                            allStrategiesPane.style.display = 'block';
+                            allStrategiesPane.style.visibility = 'visible';
+                            allStrategiesPane.style.opacity = '1';
+                            
+                            // Также активируем кнопку вкладки
+                            const allStrategiesTab = document.getElementById('all-strategies-tab');
+                            if (allStrategiesTab) {
+                                allStrategiesTab.classList.add('active');
+                                allStrategiesTab.setAttribute('aria-selected', 'true');
+                            }
+                            
+                            // Убеждаемся, что tab-content видим
+                            const tabContent = allStrategiesPane.closest('.tab-content');
+                            if (tabContent) {
+                                tabContent.style.display = 'block';
+                                console.log('tab-content исправлен');
+                            }
+                            
+                            // Убеждаемся, что все родители видимы
+                            let checkParent = allStrategiesPane.parentElement;
+                            while (checkParent && checkParent !== document.body) {
+                                const parentStyle = window.getComputedStyle(checkParent);
+                                if (parentStyle.display === 'none') {
+                                    console.log('Исправляем скрытый родитель вкладки:', checkParent);
+                                    checkParent.style.display = 'block';
+                                }
+                                checkParent = checkParent.parentElement;
+                            }
+                        }
+                        
+                        // Проверяем видимость после изменений
+                        setTimeout(() => {
+                            console.log('Контейнер видим после изменений:', container.offsetParent !== null);
+                            console.log('Вычисленные стили контейнера:', {
+                                display: window.getComputedStyle(container).display,
+                                visibility: window.getComputedStyle(container).visibility,
+                                opacity: window.getComputedStyle(container).opacity,
+                                height: window.getComputedStyle(container).height,
+                                width: window.getComputedStyle(container).width
+                            });
+                            
+                            // Проверяем, есть ли элементы внутри
+                            const row = container.querySelector('.row');
+                            if (row) {
+                                console.log('Найден .row элемент, дочерних элементов:', row.children.length);
+                                console.log('Первый дочерний элемент:', row.children[0]);
+                            } else {
+                                console.error('Элемент .row не найден в контейнере!');
+                            }
+                        }, 100);
+                        
+                        // Добавляем обработчики событий
+                        document.querySelectorAll('.view-strategy-btn').forEach(btn => {
+                            btn.addEventListener('click', () => {
+                                const figi = btn.getAttribute('data-figi');
+                                viewStrategyDetails(figi);
+                            });
+                        });
+                        
+                        document.querySelectorAll('.load-strategy-btn').forEach(btn => {
+                            btn.addEventListener('click', () => {
+                                const figi = btn.getAttribute('data-figi');
+                                loadStrategyForAutoTrade(figi);
+                            });
+                        });
+                        
+                        document.querySelectorAll('.delete-strategy-btn').forEach(btn => {
+                            btn.addEventListener('click', () => {
+                                const figi = btn.getAttribute('data-figi');
+                                const file = btn.getAttribute('data-file');
+                                deleteStrategy(figi, file);
+                            });
+                        });
+                    }
+                } else {
+                    container.innerHTML = `<div class="alert alert-danger">Ошибка: ${data.error}</div>`;
+                }
+            } catch (error) {
+                console.error('Ошибка загрузки стратегий:', error);
+                container.innerHTML = `<div class="alert alert-danger">
+                    <i class="bi bi-exclamation-triangle"></i> Ошибка загрузки стратегий: ${error.message}
+                    <br><small>Проверьте консоль браузера для подробностей</small>
+                </div>`;
+            } finally {
+                isLoadingStrategies = false;
+            }
+        }
+        
+        // Загружаем стратегии сразу при загрузке страницы, если вкладка видна
+        function checkAndLoadStrategies() {
+            console.log('Проверяем вкладку "Все стратегии"...');
+            const allStrategiesTab = document.getElementById('all-strategies-tab');
+            const allStrategiesPane = document.getElementById('all-strategies');
+            if (allStrategiesTab && allStrategiesPane) {
+                const isActive = allStrategiesTab.classList.contains('active') || 
+                                allStrategiesPane.classList.contains('active') ||
+                                allStrategiesPane.classList.contains('show');
+                console.log('Вкладка активна:', isActive);
+                if (isActive) {
+                    setTimeout(function() {
+                        console.log('Вкладка активна при загрузке, загружаем стратегии...');
+                        loadAllStrategies();
+                    }, 500);
+                }
+            }
+        }
+        
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', checkAndLoadStrategies);
+        } else {
+            checkAndLoadStrategies();
+        }
+        
+        // Просмотр деталей стратегии
+        async function viewStrategyDetails(figi) {
+            try {
+                const response = await fetch(`/api/strategy/detail/${encodeURIComponent(figi)}`);
+                const data = await response.json();
+                
+                if (data.success) {
+                    const modal = new bootstrap.Modal(document.getElementById('strategyDetailModal'));
+                    let html = `
+                        <div class="mb-3">
+                            <h6>FIGI: ${data.figi}</h6>
+                            <p><strong>Последнее обучение:</strong> ${new Date(data.last_retrain_date).toLocaleString('ru-RU')}</p>
+                            <p><strong>Требует переобучения:</strong> ${data.should_retrain ? 'Да' : 'Нет'}</p>
+                            ${data.pinescript_code ? '<p><strong>Тип:</strong> <span class="badge bg-info">PineScript</span></p>' : ''}
+                        </div>
+                    `;
+                    
+                    if (data.pinescript_code) {
+                        html += `
+                            <h6>Код PineScript:</h6>
+                            <pre class="bg-light p-3 rounded" style="max-height: 300px; overflow-y: auto;"><code>${data.pinescript_code}</code></pre>
+                        `;
+                    }
+                    
+                    html += `
+                        <h6>Параметры:</h6>
+                        <pre class="bg-light p-3 rounded" style="max-height: 400px; overflow-y: auto;"><code>${JSON.stringify(data.params, null, 2)}</code></pre>
+                        <h6 class="mt-3">Полный JSON:</h6>
+                        <pre class="bg-light p-3 rounded" style="max-height: 400px; overflow-y: auto;"><code>${JSON.stringify(data.strategy, null, 2)}</code></pre>
+                    `;
+                    
+                    document.getElementById('strategyDetailContent').innerHTML = html;
+                    modal.show();
+                } else {
+                    alert('Ошибка: ' + data.error);
+                }
+            } catch (error) {
+                alert('Ошибка: ' + error.message);
+            }
+        }
+        
+        // Загрузка стратегии для автоторговли
+        function loadStrategyForAutoTrade(figi) {
+            document.getElementById('autoTradeFigi').value = figi;
+            document.getElementById('strategies-tab').click();
+            document.getElementById('trade-auto-tab').click();
+            loadStrategy();
+        }
+        
+        // Удаление стратегии
+        async function deleteStrategy(figi, file) {
+            if (!confirm(`Вы уверены, что хотите удалить стратегию ${figi}?\nФайл: ${file}\n\nЭто действие нельзя отменить.`)) {
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/strategy/delete', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ file: file })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    alert('Стратегия успешно удалена');
+                    // Обновляем списки
+                    loadAllStrategies();
+                    loadStrategiesList();
+                    loadOptimizeStrategiesList();
+                } else {
+                    alert(`Ошибка при удалении: ${data.error}`);
+                }
+            } catch (error) {
+                console.error('Ошибка при удалении стратегии:', error);
+                alert(`Ошибка при удалении: ${error.message}`);
+            }
+        }
+        
+        // Обновление логов автоторговли
+        async function refreshAutoTradeLogs() {
+            if (!currentAccountId) return;
+            
+            const figi = document.getElementById('autoTradeFigi').value.trim();
+            if (!figi) return;
+            
+            try {
+                const response = await fetch(`/api/strategy/auto_trade/logs?figi=${encodeURIComponent(figi)}&account_id=${encodeURIComponent(currentAccountId)}&limit=100`);
+                const data = await response.json();
+                
+                if (data.success) {
+                    const logsDiv = document.getElementById('autoTradeLogs');
+                    if (data.logs.length === 0) {
+                        logsDiv.innerHTML = '<div class="text-muted">Логи появятся после запуска автоторговли</div>';
+                    } else {
+                        let html = '';
+                        data.logs.forEach(log => {
+                            const levelClass = {
+                                'INFO': 'text-info',
+                                'WARNING': 'text-warning',
+                                'ERROR': 'text-danger',
+                                'DEBUG': 'text-muted'
+                            }[log.level] || 'text-secondary';
+                            
+                            html += `<div class="${levelClass}">[${new Date(log.timestamp).toLocaleTimeString('ru-RU')}] [${log.level}] ${log.message}</div>`;
+                        });
+                        logsDiv.innerHTML = html;
+                        logsDiv.scrollTop = logsDiv.scrollHeight;
+                    }
+                }
+            } catch (error) {
+                console.error('Ошибка загрузки логов:', error);
+            }
+        }
+        
+        // Очистка логов (только визуальная)
+        function clearAutoTradeLogs() {
+            document.getElementById('autoTradeLogs').innerHTML = '<div class="text-muted">Логи очищены</div>';
+        }
+        
+        // Автообновление логов при активной автоторговле
+        let logsUpdateInterval = null;
+        function startLogsUpdates() {
+            if (logsUpdateInterval) {
+                clearInterval(logsUpdateInterval);
+            }
+            logsUpdateInterval = setInterval(refreshAutoTradeLogs, 2000); // Каждые 2 секунды
+        }
+        
+        function stopLogsUpdates() {
+            if (logsUpdateInterval) {
+                clearInterval(logsUpdateInterval);
+                logsUpdateInterval = null;
+            }
+        }
+        
+        // Обновление графика автоторговли
+        async function refreshAutoTradeChart() {
+            if (!currentAccountId) return;
+            
+            const figi = document.getElementById('autoTradeFigi').value.trim();
+            if (!figi) {
+                document.getElementById('autoTradeChart').innerHTML = '<div class="text-center text-muted p-5">Выберите стратегию и запустите автоторговлю</div>';
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/api/strategy/auto_trade/chart_data?figi=${encodeURIComponent(figi)}&account_id=${encodeURIComponent(currentAccountId)}`);
+                const data = await response.json();
+                
+                if (data.success && data.chart_data) {
+                    const chartData = data.chart_data;
+                    
+                    if (chartData.price_history.length === 0) {
+                        document.getElementById('autoTradeChart').innerHTML = '<div class="text-center text-muted p-5">Данные для графика появятся после запуска автоторговли</div>';
+                        return;
+                    }
+                    
+                    // Подготавливаем данные для графика
+                    const times = chartData.price_history.map(p => p.time);
+                    const closes = chartData.price_history.map(p => p.close);
+                    const opens = chartData.price_history.map(p => p.open);
+                    const highs = chartData.price_history.map(p => p.high);
+                    const lows = chartData.price_history.map(p => p.low);
+                    
+                    // Сигналы покупки и продажи
+                    const buySignals = chartData.signals_history.filter(s => s.action === 'BUY');
+                    const sellSignals = chartData.signals_history.filter(s => s.action === 'SELL');
+                    
+                    const buyTimes = buySignals.map(s => s.time);
+                    const buyPrices = buySignals.map(s => s.price);
+                    const sellTimes = sellSignals.map(s => s.time);
+                    const sellPrices = sellSignals.map(s => s.price);
+                    
+                    // Создаем график
+                    const traces = [
+                        {
+                            x: times,
+                            open: opens,
+                            high: highs,
+                            low: lows,
+                            close: closes,
+                            type: 'candlestick',
+                            name: 'Цена',
+                            increasing: {line: {color: '#26a69a'}},
+                            decreasing: {line: {color: '#ef5350'}},
+                        },
+                        {
+                            x: buyTimes,
+                            y: buyPrices,
+                            type: 'scatter',
+                            mode: 'markers',
+                            name: 'Покупка',
+                            marker: {
+                                color: 'green',
+                                size: 12,
+                                symbol: 'triangle-up'
+                            }
+                        },
+                        {
+                            x: sellTimes,
+                            y: sellPrices,
+                            type: 'scatter',
+                            mode: 'markers',
+                            name: 'Продажа',
+                            marker: {
+                                color: 'red',
+                                size: 12,
+                                symbol: 'triangle-down'
+                            }
+                        }
+                    ];
+                    
+                    const layout = {
+                        title: {
+                            text: `График автоторговли: ${figi} | Позиция: ${chartData.current_position || 0}`,
+                            font: {size: 16}
+                        },
+                        xaxis: {
+                            title: 'Время',
+                            type: 'date'
+                        },
+                        yaxis: {
+                            title: 'Цена (₽)'
+                        },
+                        hovermode: 'x unified',
+                        showlegend: true,
+                        height: 500,
+                        margin: {l: 60, r: 30, t: 50, b: 50}
+                    };
+                    
+                    Plotly.newPlot('autoTradeChart', traces, layout, {responsive: true});
+                } else {
+                    document.getElementById('autoTradeChart').innerHTML = '<div class="text-center text-muted p-5">Ошибка загрузки данных графика</div>';
+                }
+            } catch (error) {
+                console.error('Ошибка загрузки графика:', error);
+                document.getElementById('autoTradeChart').innerHTML = '<div class="text-center text-danger p-5">Ошибка: ' + error.message + '</div>';
+            }
+        }
+        
+        // Автообновление графика
+        let chartUpdateInterval = null;
+        function startChartUpdates() {
+            if (chartUpdateInterval) {
+                clearInterval(chartUpdateInterval);
+            }
+            chartUpdateInterval = setInterval(refreshAutoTradeChart, 5000); // Каждые 5 секунд
+        }
+        
+        function stopChartUpdates() {
+            if (chartUpdateInterval) {
+                clearInterval(chartUpdateInterval);
+                chartUpdateInterval = null;
+            }
+        }
+        
+        // Обработчики событий
+        document.getElementById('refreshStrategiesBtn')?.addEventListener('click', loadAllStrategies);
+        
+        // Функция для открытия модального окна добавления стратегии
+        function openAddStrategyModal() {
+            const modalElement = document.getElementById('addStrategyModal');
+            if (modalElement) {
+                const modal = new bootstrap.Modal(modalElement);
+                modal.show();
+            } else {
+                console.error('Модальное окно addStrategyModal не найдено');
+            }
+        }
+        
+        // Кнопка во вкладке "Все стратегии"
+        document.getElementById('addStrategyBtn')?.addEventListener('click', openAddStrategyModal);
+        
+        // Кнопка во вкладке "Стратегии"
+        document.getElementById('addStrategyBtnFromStrategies')?.addEventListener('click', openAddStrategyModal);
+        document.getElementById('refreshLogsBtn')?.addEventListener('click', refreshAutoTradeLogs);
+        document.getElementById('clearLogsBtn')?.addEventListener('click', clearAutoTradeLogs);
+        document.getElementById('refreshChartBtn')?.addEventListener('click', refreshAutoTradeChart);
+        
+        // Загружаем стратегии при открытии вкладки
+        function setupAllStrategiesTabHandlers() {
+            const allStrategiesTab = document.getElementById('all-strategies-tab');
+            const allStrategiesPane = document.getElementById('all-strategies');
+            
+            if (allStrategiesTab && allStrategiesPane) {
+                // Bootstrap 5 событие на панели (более надежное)
+                allStrategiesPane.addEventListener('shown.bs.tab', function() {
+                    console.log('Вкладка "Все стратегии" открыта (shown.bs.tab на pane), загружаем стратегии...');
+                    // Небольшая задержка, чтобы Bootstrap успел применить стили
+                    setTimeout(loadAllStrategies, 100);
+                });
+                
+                // Bootstrap 5 событие на вкладке
+                allStrategiesTab.addEventListener('shown.bs.tab', function() {
+                    console.log('Вкладка "Все стратегии" открыта (shown.bs.tab на tab), загружаем стратегии...');
+                    // Небольшая задержка, чтобы Bootstrap успел применить стили
+                    setTimeout(loadAllStrategies, 100);
+                });
+                
+                // Также слушаем событие на всем tab-content
+                const tabContent = document.getElementById('mainTabsContent');
+                if (tabContent) {
+                    tabContent.addEventListener('shown.bs.tab', function(event) {
+                        if (event.target && event.target.id === 'all-strategies-tab') {
+                            console.log('Вкладка "Все стратегии" открыта (shown.bs.tab на tabContent), загружаем стратегии...');
+                            setTimeout(loadAllStrategies, 100);
+                        }
+                    });
+                }
+                
+                // Также загружаем при клике на вкладку (только один раз)
+                // НЕ добавляем обработчик на клик, чтобы избежать множественных вызовов
+                // Bootstrap события shown.bs.tab достаточно
+            } else {
+                console.error('Элементы all-strategies-tab или all-strategies не найдены');
+            }
+        }
+        
+        // Инициализируем обработчики
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', setupAllStrategiesTabHandlers);
+        } else {
+            setupAllStrategiesTabHandlers();
+        }
+        
+        // Обновляем логи и график при открытии вкладки автоторговли
+        document.getElementById('trade-auto-tab')?.addEventListener('shown.bs.tab', () => {
+            loadStrategiesList(); // Загружаем список стратегий
+            refreshAutoTradeLogs();
+            startLogsUpdates();
+            refreshAutoTradeChart();
+            startChartUpdates();
+        });
+        
+        // Останавливаем обновление при закрытии вкладки
+        document.getElementById('trade-auto-tab')?.addEventListener('hidden.bs.tab', () => {
+            stopLogsUpdates();
+            stopChartUpdates();
+        });
+        
+        // Сохранение стратегии из кода
+        async function saveStrategyFromCode() {
+            console.log('Функция saveStrategyFromCode вызвана');
+            
+            // Определяем, какая вкладка активна (Bootstrap 5)
+            const pythonTab = document.getElementById('python-code');
+            const pinescriptTab = document.getElementById('pinescript-code');
+            const pythonTabButton = document.getElementById('python-tab');
+            const pinescriptTabButton = document.getElementById('pinescript-tab');
+            
+            if (!pythonTab || !pinescriptTab || !pythonTabButton || !pinescriptTabButton) {
+                alert('Ошибка: не найдены элементы вкладок. Обновите страницу.');
+                console.error('Не найдены элементы вкладок:', {
+                    pythonTab: !!pythonTab,
+                    pinescriptTab: !!pinescriptTab,
+                    pythonTabButton: !!pythonTabButton,
+                    pinescriptTabButton: !!pinescriptTabButton
+                });
+                return;
+            }
+            
+            // В Bootstrap 5 активная кнопка имеет класс 'active'
+            // Это самый надежный способ определить активную вкладку
+            const pythonButtonActive = pythonTabButton.classList.contains('active');
+            const pinescriptButtonActive = pinescriptTabButton.classList.contains('active');
+            
+            // Также проверяем панели для дополнительной уверенности
+            const pythonTabActive = pythonTab.classList.contains('active') && pythonTab.classList.contains('show');
+            const pinescriptTabActive = pinescriptTab.classList.contains('active') && pinescriptTab.classList.contains('show');
+            
+            // Определяем тип: если кнопка PineScript активна, то это PineScript
+            // Если ни одна кнопка не активна, проверяем панели
+            const isPineScript = pinescriptButtonActive || (pinescriptTabActive && !pythonButtonActive);
+            
+            console.log('Определение типа стратегии:', {
+                isPineScript,
+                pythonTabActive,
+                pythonTabShow: pythonTab.classList.contains('show'),
+                pinescriptTabActive,
+                pinescriptTabShow: pinescriptTab.classList.contains('show'),
+                pythonButtonActive,
+                pinescriptButtonActive
+            });
+            
+            let code, figi, name, codeType;
+            
+            if (isPineScript) {
+                // PineScript
+                const codeInput = document.getElementById('pinescriptCodeInput');
+                const figiInput = document.getElementById('pinescriptFigi');
+                const nameInput = document.getElementById('pinescriptName');
+                
+                if (!codeInput || !figiInput) {
+                    alert('Ошибка: не найдены поля для ввода PineScript кода');
+                    return;
+                }
+                
+                code = codeInput.value.trim();
+                figi = figiInput.value.trim();
+                name = nameInput ? nameInput.value.trim() : '';
+                codeType = 'pinescript';
+            } else {
+                // Python
+                const codeInput = document.getElementById('strategyCodeInput');
+                const figiInput = document.getElementById('strategyCodeFigi');
+                const nameInput = document.getElementById('strategyCodeName');
+                
+                if (!codeInput || !figiInput) {
+                    alert('Ошибка: не найдены поля для ввода Python кода');
+                    return;
+                }
+                
+                code = codeInput.value.trim();
+                figi = figiInput.value.trim();
+                name = nameInput ? nameInput.value.trim() : '';
+                codeType = 'python';
+            }
+            
+            console.log('Данные для сохранения:', { codeType, figi, hasCode: !!code, hasName: !!name });
+            
+            if (!code || !figi) {
+                alert('Заполните код стратегии и FIGI');
+                return;
+            }
+            
+            const resultDiv = document.getElementById('strategyCodeResult');
+            if (!resultDiv) {
+                alert('Ошибка: не найден контейнер для результатов');
+                return;
+            }
+            
+            resultDiv.innerHTML = '<div class="text-center"><i class="bi bi-arrow-repeat spin"></i> Сохранение...</div>';
+            
+            try {
+                const requestData = { 
+                    figi, 
+                    name, 
+                    code_type: codeType 
+                };
+                
+                // Для PineScript отправляем и code, и pinescript_code
+                // Для Python отправляем только code
+                if (isPineScript) {
+                    requestData.code = code;
+                    requestData.pinescript_code = code;
+                } else {
+                    requestData.code = code;
+                }
+                
+                console.log('Отправка запроса:', { 
+                    ...requestData, 
+                    code: code ? code.substring(0, 50) + '...' : 'пусто',
+                    pinescript_code: isPineScript ? (code ? code.substring(0, 50) + '...' : 'пусто') : 'не отправляется'
+                });
+                
+                const response = await fetch('/api/strategy/save_from_code', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(requestData)
+                });
+                
+                console.log('Ответ сервера:', response.status, response.statusText);
+                
+                const data = await response.json();
+                console.log('Данные ответа:', data);
+                
+                if (data.success) {
+                    resultDiv.innerHTML = `<div class="alert alert-success">${data.message || 'Стратегия успешно сохранена!'}</div>`;
+                    // Очищаем поля
+                    if (isPineScript) {
+                        const codeInput = document.getElementById('pinescriptCodeInput');
+                        const figiInput = document.getElementById('pinescriptFigi');
+                        const nameInput = document.getElementById('pinescriptName');
+                        if (codeInput) codeInput.value = '';
+                        if (figiInput) figiInput.value = '';
+                        if (nameInput) nameInput.value = '';
+                    } else {
+                        const codeInput = document.getElementById('strategyCodeInput');
+                        const figiInput = document.getElementById('strategyCodeFigi');
+                        const nameInput = document.getElementById('strategyCodeName');
+                        if (codeInput) codeInput.value = '';
+                        if (figiInput) figiInput.value = '';
+                        if (nameInput) nameInput.value = '';
+                    }
+                    loadAllStrategies();
+                    // Обновляем списки стратегий в других местах
+                    loadStrategiesList();
+                    loadOptimizeStrategiesList();
+                    setTimeout(() => {
+                        const modal = bootstrap.Modal.getInstance(document.getElementById('addStrategyModal'));
+                        if (modal) {
+                            modal.hide();
+                        }
+                    }, 1500);
+                } else {
+                    resultDiv.innerHTML = `<div class="alert alert-danger">Ошибка: ${data.error || 'Неизвестная ошибка'}</div>`;
+                }
+            } catch (error) {
+                console.error('Ошибка при сохранении стратегии:', error);
+                resultDiv.innerHTML = `<div class="alert alert-danger">Ошибка: ${error.message}</div>`;
+            }
+        }
+        
+        // Привязываем кнопку сохранения стратегии
+        // Используем делегирование событий, так как модальное окно может быть создано динамически
+        function setupSaveStrategyButton() {
+            const saveStrategyBtn = document.getElementById('saveStrategyCodeBtn');
+            if (saveStrategyBtn) {
+                // Удаляем старый обработчик, если есть
+                const newBtn = saveStrategyBtn.cloneNode(true);
+                saveStrategyBtn.parentNode.replaceChild(newBtn, saveStrategyBtn);
+                
+                // Привязываем новый обработчик
+                newBtn.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    console.log('Кнопка сохранения стратегии нажата');
+                    saveStrategyFromCode();
+                });
+                console.log('Обработчик сохранения стратегии привязан');
+                return true;
+            } else {
+                console.warn('Кнопка saveStrategyCodeBtn не найдена, попробуем позже');
+                return false;
+            }
+        }
+        
+        // Пытаемся привязать сразу
+        if (!setupSaveStrategyButton()) {
+            // Если не получилось, пробуем после загрузки DOM
+            document.addEventListener('DOMContentLoaded', function() {
+                setupSaveStrategyButton();
+            });
+        }
+        
+        // Также привязываем при открытии модального окна
+        const addStrategyModal = document.getElementById('addStrategyModal');
+        if (addStrategyModal) {
+            addStrategyModal.addEventListener('shown.bs.modal', function() {
+                console.log('Модальное окно открыто, привязываем кнопку сохранения');
+                setupSaveStrategyButton();
+            });
+        }
+        
+        // Используем делегирование событий как запасной вариант
+        document.addEventListener('click', function(e) {
+            if (e.target && e.target.id === 'saveStrategyCodeBtn') {
+                e.preventDefault();
+                e.stopPropagation();
+                console.log('Кнопка сохранения найдена через делегирование событий');
+                saveStrategyFromCode();
+            }
+        });
+    </script>
+    
+    <!-- Модальное окно для просмотра деталей стратегии -->
+    <div class="modal fade" id="strategyDetailModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Детали стратегии</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body" id="strategyDetailContent">
+                    <!-- Контент загружается динамически -->
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Закрыть</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Модальное окно для добавления стратегии из кода -->
+    <div class="modal fade" id="addStrategyModal" tabindex="-1">
+        <div class="modal-dialog modal-xl">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="bi bi-code-square"></i> Добавить стратегию из кода</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <ul class="nav nav-tabs mb-3" role="tablist">
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link active" id="python-tab" data-bs-toggle="tab" data-bs-target="#python-code" type="button" role="tab">
+                                <i class="bi bi-filetype-py"></i> Python
+                            </button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="pinescript-tab" data-bs-toggle="tab" data-bs-target="#pinescript-code" type="button" role="tab">
+                                <i class="bi bi-code-square"></i> PineScript
+                            </button>
+                        </li>
+                    </ul>
+                    
+                    <div class="tab-content">
+                        <!-- Вкладка Python -->
+                        <div class="tab-pane fade show active" id="python-code" role="tabpanel">
+                            <div class="alert alert-info">
+                                <i class="bi bi-info-circle"></i> Вставьте код Python, который создает объект <code>AdaptiveStrategy</code> с именем <code>strategy</code>.
+                                <br><small>Пример:</small>
+                                <pre class="bg-light p-2 mt-2"><code>from strategy_optimizer import AdaptiveStrategy, OptimizedParams
+
+params = OptimizedParams(
+    kama_len=21,
+    kama_fast=2,
+    kama_slow=20,
+    entry_mult=1.6,
+    exit_mult=0.8,
+    atr_len=14,
+    atr_sl_mult=2.2,
+    atr_phase_len=50,
+    atr_phase_mult=1.0,
+    body_atr_mult=0.5,
+    fitness_score=0.85,
+    total_profit_pct=15.5,
+    sharpe_ratio=1.2,
+    max_drawdown_pct=-5.3,
+    win_rate=65.0,
+    total_trades=120
+)
+
+strategy = AdaptiveStrategy(
+    figi='BBG004730N88',
+    optimized_params=params
+)</code></pre>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">FIGI инструмента</label>
+                                <input type="text" id="strategyCodeFigi" class="form-control" placeholder="BBG004730N88">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Название стратегии (опционально)</label>
+                                <input type="text" id="strategyCodeName" class="form-control" placeholder="Моя стратегия">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Код Python</label>
+                                <textarea id="strategyCodeInput" class="form-control" rows="15" style="font-family: monospace;" placeholder="Вставьте код Python здесь..."></textarea>
+                            </div>
+                        </div>
+                        
+                        <!-- Вкладка PineScript -->
+                        <div class="tab-pane fade" id="pinescript-code" role="tabpanel">
+                            <div class="alert alert-warning">
+                                <i class="bi bi-exclamation-triangle"></i> <strong>Внимание!</strong> PineScript код будет сохранен, но для использования стратегии необходимо обучить её на исторических данных. Параметры будут установлены по умолчанию.
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">FIGI инструмента</label>
+                                <input type="text" id="pinescriptFigi" class="form-control" placeholder="BBG004730N88">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Название стратегии (опционально)</label>
+                                <input type="text" id="pinescriptName" class="form-control" placeholder="Моя PineScript стратегия">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Код PineScript</label>
+                                <textarea id="pinescriptCodeInput" class="form-control" rows="20" style="font-family: monospace;" placeholder="//@version=5
+strategy('My Strategy', overlay=true)
+
+// Ваш код PineScript здесь
+sma20 = ta.sma(close, 20)
+sma50 = ta.sma(close, 50)
+
+if ta.crossover(sma20, sma50)
+    strategy.entry('Long', strategy.long)
+
+if ta.crossunder(sma20, sma50)
+    strategy.close('Long')"></textarea>
+                                <small class="text-muted">Вставьте код PineScript из TradingView</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div id="strategyCodeResult"></div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                    <button type="button" class="btn btn-primary" id="saveStrategyCodeBtn"><i class="bi bi-save"></i> Сохранить стратегию</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
+

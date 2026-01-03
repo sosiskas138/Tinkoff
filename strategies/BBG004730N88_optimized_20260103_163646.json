@@ -1,0 +1,23 @@
+{
+  "figi": "BBG004730N88",
+  "params": {
+    "kama_len": 36,
+    "kama_fast": 6,
+    "kama_slow": 16,
+    "entry_mult": 0.6079813522484732,
+    "exit_mult": 1.5392313346582838,
+    "atr_len": 16,
+    "atr_sl_mult": 3.675841032697492,
+    "atr_phase_len": 95,
+    "atr_phase_mult": 0.6333574772200652,
+    "body_atr_mult": 0.2043933337487384,
+    "fitness_score": 1.378639921878161,
+    "total_profit_pct": 138.55549469857712,
+    "sharpe_ratio": 0.24695188121405495,
+    "max_drawdown_pct": -51.614734395323836,
+    "win_rate": 70.0,
+    "total_trades": 10
+  },
+  "last_retrain_date": "2026-01-03T16:36:46.244088",
+  "retrain_period_days": 30
+}

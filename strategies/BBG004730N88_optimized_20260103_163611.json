@@ -1,0 +1,24 @@
+{
+  "figi": "BBG004730N88",
+  "params": {
+    "kama_len": 21,
+    "kama_fast": 2,
+    "kama_slow": 20,
+    "entry_mult": 1.6,
+    "exit_mult": 0.8,
+    "atr_len": 14,
+    "atr_sl_mult": 2.2,
+    "atr_phase_len": 50,
+    "atr_phase_mult": 1.0,
+    "body_atr_mult": 0.5,
+    "fitness_score": 0.0,
+    "total_profit_pct": 0.0,
+    "sharpe_ratio": 0.0,
+    "max_drawdown_pct": 0.0,
+    "win_rate": 0.0,
+    "total_trades": 0
+  },
+  "last_retrain_date": "2026-01-03T16:36:11.937879",
+  "retrain_period_days": 30,
+  "pinescript_code": "//@version=5\nstrategy(\"KAMA‑Core v1.1 — SBER 1H\", overlay=true,\n     initial_capital=10000, default_qty_type=strategy.percent_of_equity, default_qty_value=100)\n\n//======================== INPUTS ========================\n\nlen        = input.int(21,  \"KAMA Length\")\nfast       = input.int(2,   \"Fast Length\")\nslow       = input.int(20,  \"Slow Length\")\n\nentryMult  = input.float(1.6, \"Entry Sensitivity (mult of stdev)\")\nexitMult   = input.float(0.8, \"Exit Sensitivity (mult of stdev)\")\n\natrLen     = input.int(14, \"ATR Length\")\natrSLmult  = input.float(2.2, \"ATR SL Multiplier\")\n\natrPhaseLen  = input.int(50, \"ATR Phase SMA Length\")\natrPhaseMult = input.float(1.0, \"ATR Phase Multiplier (ATR > SMA*mult)\")\n\nbodyAtrMult  = input.float(0.5, \"Candle body > ATR * (this)\")\n\n//======================== KAMA MODULE ========================\n\ngetKAMA(src, length, fastLength, slowLength) =>\n    mom = math.abs(ta.change(src, length))\n    vol = math.sum(math.abs(ta.change(src)), length)\n    er = vol != 0 ? mom / vol : 0\n    fast = 2 / (fastLength + 1)\n    slow = 2 / (slowLength + 1)\n    sc = math.pow(er * (fast - slow) + slow, 2)\n    kama = 0.0\n    kama := sc * src + (1 - sc) * nz(kama[1])\n    kama\n\nkama = getKAMA(close, len, fast, slow)\nkamaDelta = kama - kama[1]\n\n//======================== VOLATILITY MODULE (ATR) ========================\n\natr = ta.atr(atrLen)\natrSma = ta.sma(atr, atrPhaseLen)\natrPhaseThreshold = atrSma * atrPhaseMult\n\ninVolPhase = atr > atrPhaseThreshold\n\n//======================== CANDLE STRUCTURE FILTER ========================\n\nbody = math.abs(close - open)\nisBullStrong = close > open and body > atr * bodyAtrMult\n\n//======================== FILTERS FROM KAMA ========================\n\nentryFilter = entryMult * ta.stdev(kamaDelta, len)\nexitFilter  = exitMult  * ta.stdev(kamaDelta, len)\n\n//======================== SL LEVEL ========================\n\nslLevel = close - atr * atrSLmult\n\n//======================== ENTRY CONDITION ========================\n\nlongEntryCore = kamaDelta > 0 and kamaDelta > entryFilter\nlongEntry = longEntryCore and inVolPhase and isBullStrong\n\nif longEntry\n    strategy.entry(\"Buy\", strategy.long)\n\n//======================== EXIT CONDITION ========================\n\nlongClose = (kamaDelta < 0 and math.abs(kamaDelta) > exitFilter) or (strategy.position_size > 0 and close <= slLevel)\n\nstrategy.close(\"Buy\", when=longClose)\n\n//======================== PLOTS ========================\n\nplot(kama, \"KAMA\", color=color.new(color.red, 0), linewidth=2)\nplot(slLevel, \"SL\", color=color.new(color.blue, 60))\n\nplotchar(inVolPhase, \"Vol Phase ON\", \"V\", location=location.bottom, color=color.new(color.green, 0), size=size.tiny)\nplotchar(isBullStrong, \"Strong Bull Candle\", \"B\", location=location.bottom, color=color.new(color.lime, 0), size=size.tiny)\n\n//======================== MONITORING TABLE ========================\n\nvar table monitor = table.new(position.top_right, 1, 6, border_width=1, frame_color=color.new(color.white, 60))\n\nvar string phaseTxt = \"\"\nphaseTxt := inVolPhase ? \"EXPANSION\" : \"QUIET\"\n\nvar string posTxt = \"\"\nposTxt := strategy.position_size > 0 ? \"IN POSITION\" : \"FLAT\"\n\nif barstate.islast\n    table.cell(monitor, 0, 0, \"KAMA‑Core v1.1 SBER 1H\", text_color=color.white, bgcolor=color.new(color.blue, 70))\n    table.cell(monitor, 0, 1, \"len=\" + str.tostring(len) + \"  fast=\" + str.tostring(fast) + \"  slow=\" + str.tostring(slow), text_color=color.white, bgcolor=color.new(color.black, 60))\n    table.cell(monitor, 0, 2, \"EntryMult=\" + str.tostring(entryMult) + \"  ExitMult=\" + str.tostring(exitMult), text_color=color.white, bgcolor=color.new(color.black, 60))\n    table.cell(monitor, 0, 3, \"ATR SL x\" + str.tostring(atrSLmult), text_color=color.white, bgcolor=color.new(color.black, 60))\n    table.cell(monitor, 0, 4, \"Phase: \" + phaseTxt, text_color=inVolPhase ? color.lime : color.orange, bgcolor=color.new(color.black, 60))\n    table.cell(monitor, 0, 5, \"Position: \" + posTxt, text_color=strategy.position_size > 0 ? color.lime : color.silver, bgcolor=color.new(color.black, 60))"
+}

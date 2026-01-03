@@ -1,0 +1,150 @@
+name: Custom Issue
+description: Проблемы, вопросы, ...
+body:
+- type: textarea
+  id: what-happened
+  attributes:
+    label: Что случилось?
+    description: Краткое описание.
+  validations:
+    required: true
+- type: textarea
+  id: to-reproduce
+  attributes:
+    label: Воспроизведение
+    description: Код повторяющий кейс
+    render: Python
+  validations:
+    required: false
+- type: dropdown
+  id: package-version
+  attributes:
+    label: Tinkoff Invest Version
+    description: Какая версия библиотеки используется?
+    options:
+    - 0.2.0-beta117
+    - 0.2.0-beta116
+    - 0.2.0-beta115
+    - 0.2.0-beta114
+    - 0.2.0-beta113
+    - 0.2.0-beta112
+    - 0.2.0-beta111
+    - 0.2.0-beta110
+    - 0.2.0-beta109
+    - 0.2.0-beta108
+    - 0.2.0-beta107
+    - 0.2.0-beta106
+    - 0.2.0-beta105
+    - 0.2.0-beta104
+    - 0.2.0-beta103
+    - 0.2.0-beta101
+    - 0.2.0-beta100
+    - 0.2.0-beta99
+    - 0.2.0-beta98
+    - 0.2.0-beta97
+    - 0.2.0-beta96
+    - 0.2.0-beta95
+    - 0.2.0-beta94
+    - 0.2.0-beta93
+    - 0.2.0-beta92
+    - 0.2.0-beta91
+    - 0.2.0-beta90
+    - 0.2.0-beta89
+    - 0.2.0-beta88
+    - 0.2.0-beta87
+    - 0.2.0-beta86
+    - 0.2.0-beta85
+    - 0.2.0-beta84
+    - 0.2.0-beta83
+    - 0.2.0-beta82
+    - 0.2.0-beta81
+    - 0.2.0-beta80
+    - 0.2.0-beta79
+    - 0.2.0-beta78
+    - 0.2.0-beta77
+    - 0.2.0-beta76
+    - 0.2.0-beta75
+    - 0.2.0-beta74
+    - 0.2.0-beta73
+    - 0.2.0-beta72
+    - 0.2.0-beta71
+    - 0.2.0-beta70
+    - 0.2.0-beta69
+    - 0.2.0-beta68
+    - 0.2.0-beta67
+    - 0.2.0-beta66
+    - 0.2.0-beta65
+    - 0.2.0-beta64
+    - 0.2.0-beta63
+    - 0.2.0-beta62
+    - 0.2.0-beta61
+    - 0.2.0-beta60
+    - 0.2.0-beta59
+    - 0.2.0-beta58
+    - 0.2.0-beta57
+    - 0.2.0-beta56
+    - 0.2.0-beta55
+    - 0.2.0-beta54
+    - 0.2.0-beta53
+    - 0.2.0-beta52
+    - 0.2.0-beta51
+    - 0.2.0-beta50
+    - 0.2.0-beta49
+    - 0.2.0-beta48
+    - 0.2.0-beta47
+    - 0.2.0-beta46
+    - 0.2.0-beta45
+    - 0.2.0-beta44
+    - 0.2.0-beta43
+    - 0.2.0-beta42
+    - 0.2.0-beta41
+    - 0.2.0-beta40
+    - 0.2.0-beta39
+    - 0.2.0-beta38
+    - 0.2.0-beta37
+    - 0.2.0-beta36
+    - 0.2.0-beta35
+    - 0.2.0-beta34
+    - 0.2.0-beta33
+    - 0.2.0-beta32
+    - 0.2.0-beta31
+    - 0.2.0-beta30
+    - 0.2.0-beta29
+    - 0.2.0-beta28
+    - 0.2.0-beta27
+    - Другая
+  validations:
+    required: true
+- type: dropdown
+  id: python-version
+  attributes:
+    label: Python Version
+    description: Какая версия Python-а используется?
+    options:
+    - '3.11'
+    - '3.10'
+    - '3.9'
+    - '3.8'
+    - Другая
+  validations:
+    required: true
+- type: dropdown
+  id: os
+  attributes:
+    label: OS
+    description: Ваша операционная система.
+    options:
+    - Windows
+    - Linux
+    - Mac OS
+    - Mac OS (m1)
+    - Другая
+  validations:
+    required: true
+- type: textarea
+  id: logs
+  attributes:
+    label: Логи
+    description: Скопируйте и вставьте сюда логи. Не забудьте скрыть чувствительные
+      данные.
+    render: Shell
