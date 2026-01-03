@@ -1,15 +1,61 @@
 #!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 """
 Модуль для автоматической торговли на live данных
+Поддерживает Windows и автоматическую установку зависимостей
 """
 import os
+import sys
 import json
 import threading
 import time
+import subprocess
 from datetime import datetime, timedelta
 from typing import Dict, Optional, Callable
 from decimal import Decimal
 import logging
+
+# Проверка и установка зависимостей
+def _check_and_install_dependencies():
+    """Проверяет наличие необходимых библиотек и устанавливает их при необходимости"""
+    # Словарь: имя модуля для импорта -> имя пакета для pip
+    required_packages = {
+        'tinkoff': 'tinkoff-investments',  # tinkoff.invest импортируется через tinkoff
+        'flask': 'flask',
+        'plotly': 'plotly',
+        'numpy': 'numpy',
+        'pandas': 'pandas',
+    }
+    
+    missing_packages = []
+    for module_name, package_name in required_packages.items():
+        try:
+            if module_name == 'tinkoff':
+                # Для tinkoff проверяем tinkoff.invest
+                __import__('tinkoff.invest')
+            else:
+                __import__(module_name)
+        except ImportError:
+            missing_packages.append(package_name)
+    
+    if missing_packages:
+        print("📦 Обнаружены отсутствующие библиотеки. Установка...")
+        print(f"   Устанавливаем: {', '.join(missing_packages)}")
+        try:
+            # Используем pip для установки
+            subprocess.check_call([
+                sys.executable, "-m", "pip", "install", "-q"
+            ] + missing_packages)
+            print("✅ Библиотеки успешно установлены!")
+            print("   Перезапустите скрипт для применения изменений.")
+        except subprocess.CalledProcessError as e:
+            print(f"❌ Ошибка установки библиотек: {e}")
+            print("   Попробуйте установить вручную:")
+            print(f"   pip install {' '.join(missing_packages)}")
+            # Не останавливаем выполнение, возможно библиотеки уже есть
+
+# Проверяем зависимости при импорте
+_check_and_install_dependencies()
 
 from tinkoff.invest.sandbox.client import SandboxClient
 from tinkoff.invest import CandleInterval, OrderDirection, OrderType
@@ -51,12 +97,6 @@ class AutoTrader:
         self.last_signal = None
         self.logs: list = []  # Логи для веб-интерфейса
         self.max_logs = 1000  # Максимальное количество логов
-        
-        # Данные для графика
-        self.price_history: list = []  # История цен
-        self.signals_history: list = []  # История сигналов
-        self.equity_history: list = []  # История капитала
-        self.max_history_points = 500  # Максимальное количество точек на графике
         
         # Данные для графика
         self.price_history: list = []  # История цен
